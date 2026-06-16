@@ -1,0 +1,267 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  StatusBar,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ToastAndroid,
+} from 'react-native';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../../theme/Colors';
+import { RFValue } from 'react-native-responsive-fontsize';
+import { Plus, Trash2, CheckCircle2 } from 'lucide-react-native';
+import CustomInput from '../../components/inputs/CustomInput';
+import MainManagerHeader from '../../components/Manager_component/MainManagerHeader';
+
+const ManagerEditProfileScreen = ({ navigation, route }: any) => {
+  const insets = useSafeAreaInsets();
+  
+  // Get initial user data from route
+  const { user } = route.params || { user: { manager_profile: {} } };
+
+  const [saving, setSaving] = useState(false);
+  
+  // Initialize State
+  const [formData, setFormData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    jobTitle: user?.manager_profile?.jobTitle || '',
+    companyName: user?.manager_profile?.companyName || '',
+    website: user?.manager_profile?.website || '',
+    bio: user?.manager_profile?.bio || '',
+    industry: user?.manager_profile?.industry || '',
+    companySize: user?.manager_profile?.companySize || '',
+    gstNumber: user?.manager_profile?.gstNumber || '',
+    foundedIn: user?.manager_profile?.foundedIn || '',
+    headquarters: user?.manager_profile?.headquarters || '',
+    location: user?.manager_profile?.location || '',
+  });
+
+  const [awards, setAwards] = useState(
+    user?.manager_profile?.awards || [
+      { title: '', year: '', description: '' }
+    ]
+  );
+
+  const updateField = (key: string, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateAward = (index: number, key: string, value: string) => {
+    const newAwards = [...awards];
+    newAwards[index] = { ...newAwards[index], [key]: value };
+    setAwards(newAwards);
+  };
+
+  const addAward = () => {
+    setAwards([...awards, { title: '', year: '', description: '' }]);
+  };
+
+  const removeAward = (index: number) => {
+    const newAwards = awards.filter((_: any, i: number) => i !== index);
+    setAwards(newAwards);
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      // Mock Save Request
+      setTimeout(() => {
+        setSaving(false);
+        ToastAndroid.show('Profile updated successfully!', ToastAndroid.SHORT);
+        navigation.goBack();
+      }, 1000);
+    } catch (_error) {
+      setSaving(false);
+      Alert.alert('Error', 'Failed to save changes.');
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content"   />
+      
+  <MainManagerHeader title="Edit Profile" subtitle='Manage your company and recruitment details'  />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, hp('5%')) }]}
+        >
+          {/* Recruiter Details */}
+          <Text style={styles.sectionTitle}>Recruiter Details</Text>
+          <View style={styles.card}>
+            <CustomInput label="Full Name" value={formData.name} onChangeText={(t: string) => updateField('name', t)} placeholder="Enter full name" />
+            <CustomInput label="Job Title" value={formData.jobTitle} onChangeText={(t: string) => updateField('jobTitle', t)} placeholder="e.g. Lead Recruiter" />
+            <CustomInput label="Email Address" value={formData.email} onChangeText={(t: string) => updateField('email', t)} placeholder="Enter email address" />
+            <CustomInput label="Phone Number" value={formData.phone} onChangeText={(t: string) => updateField('phone', t)} placeholder="Enter phone number" />
+          </View>
+
+          {/* About Company */}
+          <Text style={styles.sectionTitle}>About Company</Text>
+          <View style={styles.card}>
+            <CustomInput label="Company Name" value={formData.companyName} onChangeText={(t: string) => updateField('companyName', t)} placeholder="Enter company name" />
+            <CustomInput label="Website" value={formData.website} onChangeText={(t: string) => updateField('website', t)} placeholder="e.g. techmark.in" />
+            <CustomInput 
+              label="Company Bio" 
+              value={formData.bio} 
+              onChangeText={(t: string) => updateField('bio', t)} 
+              placeholder="Write a short description..." 
+              multiline={true} 
+            />
+          </View>
+
+          {/* Company Information */}
+          <Text style={styles.sectionTitle}>Company Information</Text>
+          <View style={styles.card}>
+            <CustomInput label="Industry" value={formData.industry} onChangeText={(t: string) => updateField('industry', t)} placeholder="e.g. IT & Enterprise Software" />
+            <CustomInput label="Company Size" value={formData.companySize} onChangeText={(t: string) => updateField('companySize', t)} placeholder="e.g. 200 - 500 Employees" />
+            <CustomInput label="GST Number" value={formData.gstNumber} onChangeText={(t: string) => updateField('gstNumber', t)} placeholder="Enter GST Number" />
+            <CustomInput label="Founded In" value={formData.foundedIn} onChangeText={(t: string) => updateField('foundedIn', t)} placeholder="e.g. 2018" />
+            <CustomInput label="Headquarters" value={formData.headquarters} onChangeText={(t: string) => updateField('headquarters', t)} placeholder="e.g. Bangalore, India" />
+            <CustomInput label="Primary Location" value={formData.location} onChangeText={(t: string) => updateField('location', t)} placeholder="e.g. Bangalore, KA, India" />
+          </View>
+
+          {/* Awards & Recognitions */}
+          <View style={styles.awardsHeaderRow}>
+            <Text style={styles.sectionTitle}>Awards & Recognitions</Text>
+            <TouchableOpacity style={styles.addAwardBtn} onPress={addAward}>
+              <Plus size={RFValue(10)} color={Colors.white} />
+              <Text style={styles.addAwardText}>Add Award</Text>
+            </TouchableOpacity>
+          </View>
+
+          {awards.map((award: any, index: number) => (
+            <View key={index} style={styles.awardCard}>
+              <View style={styles.awardHeader}>
+                <Text style={styles.awardTitle}>Award #{index + 1}</Text>
+                {awards.length > 1 && (
+                  <TouchableOpacity onPress={() => removeAward(index)}>
+                    <Trash2 size={RFValue(12)} color={Colors.danger} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <CustomInput 
+                label="Award Title" 
+                value={award.title} 
+                onChangeText={(t: string) => updateAward(index, 'title', t)} 
+                placeholder="e.g. Valued CEO" 
+              />
+              <CustomInput 
+                label="Year" 
+                value={award.year} 
+                onChangeText={(t: string) => updateAward(index, 'year', t)} 
+                placeholder="e.g. 2023" 
+              />
+              <CustomInput 
+                label="Description" 
+                value={award.description} 
+                onChangeText={(t: string) => updateAward(index, 'description', t)} 
+                placeholder="Enter description..." 
+                multiline={true} 
+              />
+            </View>
+          ))}
+
+          {/* Save Button */}
+          <TouchableOpacity 
+            style={[styles.saveBtn, saving && { opacity: 0.7 }]} 
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <CheckCircle2 color={Colors.white} size={RFValue(12)} />
+            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F8F9FC' },
+  content: {
+    paddingHorizontal: wp('2%'),
+  },
+  sectionTitle: {
+    fontSize: RFValue(10),
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: hp('1%'),
+    marginTop: hp('1%'),
+  },
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: wp('2%'),
+    marginBottom: hp('1%'),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  awardsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: hp('1%'),
+    marginBottom: hp('1%'),
+  },
+  addAwardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: wp('3%'),
+    paddingVertical: hp('0.6%'),
+    borderRadius: 8,
+    gap: wp('1%'),
+  },
+  addAwardText: {
+    color: Colors.white,
+    fontSize: RFValue(9),
+    fontWeight: '700',
+  },
+  awardCard: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    padding: wp('4%'),
+    marginBottom: hp('1.5%'),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  awardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp('1.5%'),
+  },
+  awardTitle: {
+    fontSize: RFValue(10),
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  saveBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp('1.8%'),
+    borderRadius: 12,
+    marginTop: hp('2%'),
+    gap: wp('2%'),
+  },
+  saveBtnText: {
+    color: Colors.white,
+    fontSize: RFValue(12),
+    fontWeight: '800',
+  },
+});
+
+export default ManagerEditProfileScreen;
