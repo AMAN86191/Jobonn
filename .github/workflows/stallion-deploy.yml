@@ -26,7 +26,7 @@ jobs:
       - name: Publish OTA Update to Stallion
         run: |
           COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          npx --yes stallion publish-bundle \
+          npx --yes stallion-cli publish-bundle \
             --upload-path=aman-biban/jobonn/production \
             --platform=android \
             --release-note="$COMMIT_MSG" \
