@@ -9,6 +9,7 @@ import { Colors } from './src/theme'
 import { Provider } from 'react-redux';
 import { store } from './src/redux/store';
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import Toast from 'react-native-toast-message'
 
 const App = () => {
   const { isRestartRequired, newReleaseBundle } = useStallionUpdate()
@@ -37,11 +38,12 @@ const App = () => {
   return (
     <View style={styles.container}>
       <Provider store={store}>
-      <SafeAreaProvider>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <Allroute />
-      </SafeAreaProvider>
-    </Provider>
+        <SafeAreaProvider>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <Allroute />
+          <Toast />
+        </SafeAreaProvider>
+      </Provider>
 
 
       {/* Downloading Banner */}

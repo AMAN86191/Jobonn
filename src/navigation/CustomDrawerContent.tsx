@@ -41,8 +41,8 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
   const isCandidate = state.routes[0]?.name === 'CandidateTabNavigator';
   const drawerItems = isCandidate ? candidateDrawerItems : managerDrawerItems;
 
-  const name = user?.name || (isCandidate ? 'User' : 'Manager');
-  const email = user?.email || (isCandidate ? 'user@gmail.com' : 'manager@jobonn.com');
+  const name = user?.name || (isCandidate ? 'User' : 'Company');
+  const email = user?.email || (isCandidate ? 'user@gmail.com' : 'company@jobonn.com');
 
   const nestedState = state.routes[0]?.state;
   const activeTabName = nestedState
@@ -71,7 +71,7 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
     navigation.closeDrawer();
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Login', params: { role: isCandidate ? 'candidate' : 'manager' } }],
+      routes: [{ name: 'Login', params: { role: isCandidate ? 'candidate' : 'company' } }],
     });
   };
 

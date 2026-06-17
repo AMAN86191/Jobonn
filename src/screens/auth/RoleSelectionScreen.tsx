@@ -135,7 +135,7 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleContinue = () => {
     if (!selectedRole) return;
-    const appRole = selectedRole === 'candidate' ? 'candidate' : 'manager';
+    const appRole = selectedRole === 'candidate' ? 'candidate' : 'company';
     if (fromSignup) {
       navigation.navigate('Signup', { role: appRole });
     } else {

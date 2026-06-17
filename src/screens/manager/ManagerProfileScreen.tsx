@@ -515,7 +515,7 @@ const ManagerProfileScreen = ({ navigation }: any) => {
           onPress={() =>
             navigation.reset({
               index: 0,
-              routes: [{ name: 'Login', params: { role: 'manager' } }],
+              routes: [{ name: 'Login', params: { role: 'company' } }],
             })
           }
           activeOpacity={0.85}

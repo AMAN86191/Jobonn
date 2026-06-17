@@ -1,38 +1,92 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { getCompanyPackagesSlice } from '../../redux/CompanyHomeSlice';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { RFValue } from 'react-native-responsive-fontsize';
 import { Briefcase, Building2, Check, CreditCard, ShieldCheck, Users, Crown } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
-import { contactCredits, managedCompanies, packages, revenueStreams } from '../../data/jobonnStaticData';
+
 
 const getTierTheme = (packageName: string) => {
   const name = packageName.toLowerCase();
-  if (name.includes('starter')) {
+  if (name.includes('starter') || name.includes('bronze')) {
     return {
       primaryColor: '#1D4ED8',
       bgColor: '#EFF6FF',
       icon: Briefcase,
     };
-  } else if (name.includes('growth')) {
+  } else if (name.includes('silver') || name.includes('growth')) {
     return {
-      primaryColor: '#15803D',
-      bgColor: '#F0FDF4',
+      primaryColor: '#4B5563', // Slate/Gray tone for Silver
+      bgColor: '#F3F4F6',
       icon: Building2,
+    };
+  } else if (name.includes('gold') || name.includes('premium')) {
+    return {
+      primaryColor: '#D97706', // Gold/Amber tone
+      bgColor: '#FEF3C7',
+      icon: Crown,
+    };
+  } else if (name.includes('platinum') || name.includes('diamond')) {
+    return {
+      primaryColor: '#7C3AED', // Violet tone
+      bgColor: '#F5F3FF',
+      icon: Crown,
     };
   } else {
     return {
-      primaryColor: '#EA580C',
-      bgColor: '#FFF7ED',
+      primaryColor: '#9B5DE0', // Default purple brand theme
+      bgColor: '#EEF1FF',
       icon: Crown,
     };
   }
 };
 
 const PackageManagementScreen = ({ navigation }: any) => {
-  const [selectedPackageId, setSelectedPackageId] = useState(packages.find(item => item.active)?.id || packages[0].id);
+  const dispatch = useDispatch();
+  const [packages, setPackages] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
+
+  const fetchPackages = async () => {
+    setLoading(true);
+    try {
+      const response = await dispatch(getCompanyPackagesSlice() as any).unwrap();
+      console.log('response', response);
+      const data = response?.data || response || [];
+      setPackages(data);
+    } catch (error) {
+      console.log('error', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePurchase = (item: any) => {
+    console.log('Purchase requested for package:', item);
+    Toast.show({
+      type: 'success',
+      text1: 'Purchase Initiated',
+      text2: `Starting purchase process for ${item.package_name || 'Package'}`,
+    });
+  };
+
+  useEffect(() => {
+    fetchPackages();
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (packages.length > 0 && selectedPackageId === null) {
+      setSelectedPackageId(packages[0].id);
+    }
+  }, [packages, selectedPackageId]);
+
+
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -54,74 +108,87 @@ const PackageManagementScreen = ({ navigation }: any) => {
           <Text style={styles.creditSub}>{contactCredits.used} used from {contactCredits.total}. Credits deduct only when contact details are unlocked.</Text>
         </View> */}
 
-        <Text style={styles.sectionTitle}>Available Packages</Text>
-        {packages.map(item => {
-          const isSelected = selectedPackageId === item.id;
-          const theme = getTierTheme(item.name);
-          const Icon = theme.icon;
 
-          return (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.packageCard, isSelected && styles.packageCardActive]}
-              onPress={() => setSelectedPackageId(item.id)}
-              activeOpacity={0.85}
-            >
-              <View style={styles.packageHeader}>
-                <View style={styles.packageHeaderLeft}>
-                  <View style={[styles.tierIconContainer, { backgroundColor: theme.bgColor }]}>
-                    <Icon size={RFValue(16)} color={theme.primaryColor} />
+        {loading && packages.length === 0 ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: hp('30%') }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : (
+          packages.map((item: any) => {
+
+            const theme = getTierTheme(item.package_name || '');
+            const Icon = theme.icon;
+
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.packageCard}
+                activeOpacity={0.85}
+              >
+                <View style={styles.packageHeader}>
+                  <View style={styles.packageHeaderLeft}>
+                    <View style={[styles.tierIconContainer, { backgroundColor: theme.bgColor }]}>
+                      <Icon size={RFValue(16)} color={theme.primaryColor} />
+                    </View>
+                    <View style={styles.packageTitleContainer}>
+                      <Text style={styles.packageName}>{item.package_name}</Text>
+                      <Text style={styles.packageAudience}>{item.duration_in_months} Month{item.duration_in_months > 1 ? 's' : ''} Plan</Text>
+                    </View>
                   </View>
-                  <View style={styles.packageTitleContainer}>
-                    <Text style={styles.packageName}>{item.name}</Text>
-                    <Text style={styles.packageAudience}>{item.audience} Package</Text>
+                  {/* {isSelected && (
+                    <View style={styles.selectedBadge}>
+                      <Text style={styles.selectedText}>Selected</Text>
+                    </View>
+                  )} */}
+                </View>
+
+                <Text style={[styles.packagePrice, { color: theme.primaryColor }]}>₹{item.price}</Text>
+
+                <View style={styles.limitGrid}>
+                  <View style={styles.limitCol}>
+                    <Briefcase size={RFValue(12)} color={theme.primaryColor} />
+                    <Text style={styles.limitValue}>{item.no_of_job_post || 0}</Text>
+                    <Text style={styles.limitLabel}>Jobs</Text>
+                  </View>
+                  <View style={styles.limitColDivider} />
+                  <View style={styles.limitCol}>
+                    <Building2 size={RFValue(12)} color={theme.primaryColor} />
+                    <Text style={styles.limitValue}>{item.no_of_location || 0}</Text>
+                    <Text style={styles.limitLabel}>Locations</Text>
+                  </View>
+                  <View style={styles.limitColDivider} />
+                  <View style={styles.limitCol}>
+                    <Users size={RFValue(12)} color={theme.primaryColor} />
+                    <Text style={styles.limitValue}>{item.no_of_users || 0}</Text>
+                    <Text style={styles.limitLabel}>Users</Text>
+                  </View>
+                  <View style={styles.limitColDivider} />
+                  <View style={styles.limitCol}>
+                    <CreditCard size={RFValue(12)} color={theme.primaryColor} />
+                    <Text style={styles.limitValue}>{item.no_of_profile || 0}</Text>
+                    <Text style={styles.limitLabel}>Profiles</Text>
                   </View>
                 </View>
-                {isSelected && (
-                  <View style={styles.selectedBadge}>
-                    <Text style={styles.selectedText}>Active</Text>
+
+                {item.package_desc ? (
+                  <View style={styles.assignedFooter}>
+                    <Text style={[styles.assignedLabel, { fontSize: RFValue(8), color: Colors.textSecondary, lineHeight: RFValue(11) }]} numberOfLines={3}>
+                      {item.package_desc}
+                    </Text>
                   </View>
-                )}
-              </View>
+                ) : null}
 
-              <Text style={[styles.packagePrice, { color: theme.primaryColor }]}>{item.price}</Text>
-
-              <View style={styles.limitGrid}>
-                <View style={styles.limitCol}>
-                  <Briefcase size={RFValue(12)} color={theme.primaryColor} />
-                  <Text style={styles.limitValue}>{item.jobs}</Text>
-                  <Text style={styles.limitLabel}>Jobs</Text>
-                </View>
-                <View style={styles.limitColDivider} />
-                <View style={styles.limitCol}>
-                  <Building2 size={RFValue(12)} color={theme.primaryColor} />
-                  <Text style={styles.limitValue}>{item.companies}</Text>
-                  <Text style={styles.limitLabel}>Companies</Text>
-                </View>
-                <View style={styles.limitColDivider} />
-                <View style={styles.limitCol}>
-                  <Users size={RFValue(12)} color={theme.primaryColor} />
-                  <Text style={styles.limitValue}>{item.recruiters}</Text>
-                  <Text style={styles.limitLabel}>Recruiters</Text>
-                </View>
-                <View style={styles.limitColDivider} />
-                <View style={styles.limitCol}>
-                  <CreditCard size={RFValue(12)} color={theme.primaryColor} />
-                  <Text style={styles.limitValue}>{item.credits}</Text>
-                  <Text style={styles.limitLabel}>Credits</Text>
-                </View>
-              </View>
-
-              <View style={styles.assignedFooter}>
-                <Building2 size={RFValue(12)} color={Colors.textSecondary} style={{ marginRight: wp('2%') }} />
-                <View>
-                  <Text style={styles.assignedLabel}>Assigned to</Text>
-                  <Text style={styles.assignedValue}>{item.assignedTo || 'Unassigned'}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+                <TouchableOpacity
+                  style={[styles.purchaseBtn, { backgroundColor: Colors.primary }]}
+                  onPress={() => handlePurchase(item)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.purchaseBtnText}>Purchase Now</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          })
+        )}
         {/* 
         <Text style={styles.sectionTitle}>Company Verification</Text>
         <View style={styles.verificationCard}>
@@ -275,6 +342,18 @@ const styles = StyleSheet.create({
   },
   assignedLabel: { fontSize: RFValue(7.5), color: Colors.textSecondary, fontWeight: '500' },
   assignedValue: { fontSize: RFValue(9), color: Colors.textPrimary, fontWeight: '600' },
+  purchaseBtn: {
+    borderRadius: 8,
+    paddingVertical: hp('1%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp('1.5%'),
+  },
+  purchaseBtnText: {
+    color: Colors.white,
+    fontSize: RFValue(9.5),
+    fontWeight: '800',
+  },
 
   verificationCard: {
     backgroundColor: Colors.white,

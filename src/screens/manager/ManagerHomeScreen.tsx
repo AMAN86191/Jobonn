@@ -104,7 +104,7 @@ const ManagerHomeScreen = ({ navigation }: any) => {
           <TouchableOpacity
             style={styles.profileBanner}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('CompleteProfile', { role: 'manager' })}
+            onPress={() => navigation.navigate('CompleteProfile', { role: 'company' })}
           >
             <View style={styles.profileBannerContent}>
               <View style={styles.profileBannerIconBg}>

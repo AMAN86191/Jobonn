@@ -19,7 +19,11 @@ import ManagerProfileSteps from "./profile/ManagerProfileSteps";
 import { RFValue } from 'react-native-responsive-fontsize';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { ChevronLeft, CheckCircle, Sparkles } from 'lucide-react-native';
-import { ToastAndroid } from 'react-native';
+import { useDispatch } from 'react-redux';
+import { useRef } from 'react';
+import { CompleteRegistrationSlice } from '../../redux/AuthSlice';
+import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'CompleteProfile'>;
@@ -27,22 +31,42 @@ type Props = {
 };
 
 const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
+  const dispatch = useDispatch();
   const role = route.params?.role ?? 'candidate';
+  const company_id = route.params?.company_id ?? '';
   const [isCompleted, setIsCompleted] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [saving, setSaving] = useState(false);
-
+  const companyProfileDataRef = useRef<any>({});
   const totalSteps = role === 'candidate' ? 5 : 2;
-
+ console.log('role', role)
   const handleStepSave = async (stepData: any, stepIndex: number) => {
     try {
       setSaving(true);
+      if (role === 'company') {
+        companyProfileDataRef.current = { ...companyProfileDataRef.current, ...stepData };
+        console.log(`[CompleteProfile] Company Step ${stepIndex + 1} cached:`, stepData);
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Progress saved!',
+        });
+        return;
+      }
       // await UpdateProfile(stepData);
       console.log(`[CompleteProfile] Step ${stepIndex + 1} saved:`, stepData);
-      ToastAndroid.show('Progress saved!', ToastAndroid.SHORT);
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Progress saved!',
+      });
     } catch (error: any) {
       console.error('Profile update failed:', error);
-      ToastAndroid.show('Failed to save. Please try again.', ToastAndroid.LONG);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to save. Please try again.',
+      });
     } finally {
       setSaving(false);
     }
@@ -51,10 +75,91 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleAllComplete = async () => {
     try {
       setSaving(true);
+      if (role === 'company') {
+        const data = companyProfileDataRef.current;
+        console.log('Final accumulated Company Profile data:', data);
+        const formData = new FormData();
+        
+        formData.append('company_id', String(company_id || ''));
+        formData.append('company_name', data.companyName || '');
+        formData.append('office_location', data.location || '');
+        formData.append('industry_type', data.industry || '');
+        formData.append('company_size', data.companySize || '');
+        formData.append('company_web_url', data.website || '');
+        formData.append('company_about', data.bio || '');
+        formData.append('gst_no', data.gstNumber || '');
+        formData.append('founded_date', data.foundedDate || '');
+        formData.append('fb_link', data.fb_link || '');
+        formData.append('insta_link', data.insta_link || '');
+        formData.append('linked_link', data.linked_link || '');
+
+        const awardsList = data.awards || [];
+        awardsList.forEach((award: any, index: number) => {
+          formData.append(`awards[${index}][award_title]`, award.title || '');
+          formData.append(`awards[${index}][award_date]`, award.date || '');
+          formData.append(`awards[${index}][desc]`, award.description || '');
+        });
+
+        if (data.companyLogo && data.companyLogo.uri) {
+          formData.append('company_logo', {
+            uri: data.companyLogo.uri,
+            name: data.companyLogo.name || 'logo.png',
+            type: data.companyLogo.type || 'image/png'
+          } as any);
+        }
+
+        if (data.coverImage && data.coverImage.uri) {
+          formData.append('cover_img', {
+            uri: data.coverImage.uri,
+            name: data.coverImage.name || 'cover.jpg',
+            type: data.coverImage.type || 'image/jpeg'
+          } as any);
+        }
+
+        if (data.verifDoc && data.verifDoc.uri) {
+          formData.append('company_docs', {
+            uri: data.verifDoc.uri,
+            name: data.verifDoc.name || 'document.pdf',
+            type: data.verifDoc.type || 'application/pdf'
+          } as any);
+        }
+
+        console.log('Submitting Company Registration payload:', formData);
+        
+        const res = await dispatch(CompleteRegistrationSlice(formData) as any).unwrap();
+        console.log('Complete registration response:', res);
+
+        if (res?.token) {
+          await AsyncStorage.setItem('userToken', res.token);
+        }
+        if (res?.company) {
+          const userData = {
+            ...(res.company.user || {}),
+            company: res.company,
+            profile_completed: true,
+          };
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        }
+
+        Toast.show({
+          type: 'success',
+          text1: 'Registration Completed',
+          text2: res?.message || 'Company Profile updated successfully!',
+        });
+        
+        setIsCompleted(true);
+        return;
+      }
+
       // await UpdateProfile({ profile_completed: true });
       setIsCompleted(true);
     } catch (error: any) {
       console.error('Failed to mark profile complete:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Complete Profile',
+        text2: error?.message || 'An error occurred during submission.',
+      });
     } finally {
       setSaving(false);
     }

@@ -44,9 +44,9 @@ export type RootStackParamList = {
   SplashScreen: undefined;
   Onboarding: undefined;
   RoleSelection: { fromSignup?: boolean };
-  Login: { role?: 'candidate' | 'manager' };
-  Signup: { role: 'candidate' | 'manager' };
-  CompleteProfile: { role: 'candidate' | 'manager' };
+  Login: { role?: 'candidate' | 'company' } | undefined;
+  Signup: { role: 'candidate' | 'company' };
+  CompleteProfile: { role?: 'candidate' | 'company'; [key: string]: any } | undefined;
   ForgotPassword: undefined;
   ResetPassword: undefined;
 

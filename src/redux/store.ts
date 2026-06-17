@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import auth from './AuthSlice';
+import companyHome from './CompanyHomeSlice';
 
 export const store = configureStore({
   reducer: {
     auth: auth,
+    companyHome: companyHome,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
