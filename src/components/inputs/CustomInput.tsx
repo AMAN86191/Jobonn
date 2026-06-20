@@ -108,10 +108,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputWrapper: {
-    height: hp('5.5%'),
-    minHeight: 48,
+    height: hp('4.5%'),
+    minHeight: 35,
     backgroundColor: Colors.white,
-    borderRadius: wp('3%'),
+    borderRadius: wp('2%'),
     borderWidth: 1,
     borderColor: Colors.border,
     flexDirection: 'row',

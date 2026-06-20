@@ -70,10 +70,10 @@ const styles = StyleSheet.create({
     marginBottom: hp('0.6%'),
   },
   inputWrapper: {
-    height: hp('5%'),
-    minHeight: 44,
+    height: hp('4.5%'),
+    minHeight: 35,
     backgroundColor: Colors.white,
-    borderRadius: wp('3%'),
+    borderRadius: wp('2%'),
     borderWidth: 1,
     borderColor: Colors.border,
     flexDirection: 'row',

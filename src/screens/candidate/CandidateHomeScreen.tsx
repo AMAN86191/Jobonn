@@ -8,6 +8,11 @@ import { Search, Briefcase, Wifi, ShoppingBag, Clock, GraduationCap, Bell, Monit
 import JobCard from '../../components/Candidate_component/JobCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { candidateProfile, jobs, jobInvites, getApplicationJobs } from '../../data/jobonnStaticData';
+import CandidateProfileCompletenessBanner from '../../components/Manager_component/CandidateProfileCompletenessBanner';
+import { getCandidateProfileCompleteness } from '../../utils/candidateProfileCompleteness';
+
+import { useDispatch } from 'react-redux';
+import { getProfileSlice } from '../../redux/CandidateProfileSlice';
 
 const FEATURED_JOBS = jobs.filter(job => job.isFeatured);
 
@@ -36,32 +41,60 @@ const DEPARTMENTS = [
 ];
 
 const CandidateHomeScreen = ({ navigation }: any) => {
+  const dispatch = useDispatch();
   const [activeCategory, setActiveCategory] = useState(1);
   const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {
-    const loadUser = async () => {
+   const loadUser = async () => {
+    try {
       const data = await AsyncStorage.getItem('userData');
       if (data) setUser(JSON.parse(data));
-    };
+    } catch (err) {
+      console.warn('Failed to load local cached user data', err);
+    }
+
+    try {
+      const response = await dispatch(getProfileSlice() as any).unwrap();
+      console.log('HomeScreen fetched fresh profile successfully:', response);
+      if (response && response.status && response.candidate) {
+        const candidate = response.candidate;
+        const userObj = candidate.user || {};
+        const mappedUser = {
+          ...userObj,
+          candidate: candidate,
+          role: userObj.role || 'candidate',
+        };
+        await AsyncStorage.setItem('userData', JSON.stringify(mappedUser));
+        setUser(mappedUser);
+      }
+    } catch (apiError) {
+      console.error('Error fetching profile in HomeScreen:', apiError);
+    }
+  };
+
+  React.useEffect(() => {
     loadUser();
-  }, []);
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUser();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const profile = user || candidateProfile;
-  const name = profile?.name || 'User';
+  const name = profile?.name || profile?.user?.name || 'User';
   const firstName = name.split(' ')[0];
   const appliedJobs = getApplicationJobs();
   const recentInvites = jobInvites.filter(invite => invite.status === 'pending');
+
+  const completeness = getCandidateProfileCompleteness(user || candidateProfile);
+  const completionPercent = completeness.percentage;
+
   const dashboardStats = [
-    { label: 'Profile', value: `${candidateProfile.completionScore}%`, icon: TrendingUp, color: Colors.primary },
+    { label: 'Profile', value: `${completionPercent}%`, icon: TrendingUp, color: Colors.primary },
     { label: 'Applied', value: `${appliedJobs.length}`, icon: FileText, color: Colors.info },
     { label: 'Views', value: `${candidateProfile.profileViews}`, icon: Users, color: Colors.success },
     { label: 'Invites', value: `${recentInvites.length}`, icon: Bell, color: Colors.warning },
-  ];
-  const verificationItems = [
-    { label: 'Email', done: candidateProfile.verification.email },
-    { label: 'Mobile', done: candidateProfile.verification.mobile },
-    { label: 'Resume', done: candidateProfile.verification.resume },
   ];
 
   return (
@@ -114,27 +147,8 @@ const CandidateHomeScreen = ({ navigation }: any) => {
           })}
         </View>
 
-
-
         {/* Incomplete Profile Banner */}
-        {!candidateProfile.profile_completed && (
-          <TouchableOpacity
-            style={styles.profileBanner}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('CompleteProfile', { role: 'candidate' })}
-          >
-            <View style={styles.profileBannerContent}>
-              <View style={styles.profileBannerIconBg}>
-                <AlertCircle size={RFValue(12)} color={Colors.warning} />
-              </View>
-              <View style={styles.profileBannerTextWrap}>
-                <Text style={styles.profileBannerTitle}>Complete Your Profile</Text>
-                <Text style={styles.profileBannerSub}>{candidateProfile.missingItems[0]} to improve database ranking.</Text>
-              </View>
-              <ChevronRight size={RFValue(12)} color={Colors.warning} />
-            </View>
-          </TouchableOpacity>
-        )}
+        <CandidateProfileCompletenessBanner user={user} navigation={navigation} />
 
         {/* Search Section */}
         <View style={styles.searchRow}>

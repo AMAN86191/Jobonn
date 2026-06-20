@@ -21,41 +21,38 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { ChevronLeft, CheckCircle, Sparkles } from 'lucide-react-native';
 import { useDispatch } from 'react-redux';
 import { useRef } from 'react';
-import { CompleteRegistrationSlice } from '../../redux/AuthSlice';
+import { 
+ UpdateCompanyProfileSlice } from '../../redux/AuthSlice';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getProfileCompleteness } from '../../utils/profileCompleteness';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'CompleteProfile'>;
-  route: RouteProp<RootStackParamList, 'CompleteProfile'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'UpdateCompanyProfileScreen'>;
+  route: RouteProp<RootStackParamList, 'UpdateCompanyProfileScreen'>;
 };
 
-const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
+const UpdateCompanyProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const role = route.params?.role ?? 'candidate';
   const company_id = route.params?.company_id ?? '';
+  const isEditMode = route.params?.isEditMode ?? false;
+console.log('role', role)
+console.log('company_id', company_id)
+console.log('isEditMode', isEditMode)
   const [isCompleted, setIsCompleted] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const companyProfileDataRef = useRef<any>({});
   const totalSteps = role === 'candidate' ? 5 : 2;
 
-  const getInitialUser = () => {
-    if (route.params?.user) {
-      return route.params.user;
+  const [initialData, setInitialData] = useState<any>(route.params?.profileData || null);
+
+  React.useEffect(() => {
+    if (route.params?.profileData) {
+      setInitialData(route.params.profileData);
     }
-    if (route.params?.candidate) {
-      return {
-        ...route.params.user,
-        candidate: route.params.candidate,
-      };
-    }
-    return null;
-  };
-
-  const initialUserData = getInitialUser();
-
-
+  }, [route.params?.profileData]);
 
   console.log('role', role);
   const handleStepSave = async (stepData: any, stepIndex: number) => {
@@ -140,28 +137,33 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
         console.log('Submitting Company Registration payload:', formData);
 
-        const res = await dispatch(CompleteRegistrationSlice(formData) as any).unwrap();
-        console.log('Complete registration response:', res);
+        const res = await dispatch(UpdateCompanyProfileSlice(formData) as any).unwrap();
+        console.log('update response:', res);
 
         if (res?.token) {
           await AsyncStorage.setItem('userToken', res.token);
         }
         if (res?.company) {
+          const completeness = getProfileCompleteness(res.company);
           const userData = {
             ...(res.company.user || {}),
             company: res.company,
-            profile_completed: true,
+            profile_completed: completeness.isComplete,
           };
           await AsyncStorage.setItem('userData', JSON.stringify(userData));
         }
 
         Toast.show({
           type: 'success',
-          text1: 'Registration Completed Successfully',
+          text1: isEditMode ? 'Profile Updated' : 'Registration Completed',
           text2: res?.message || 'Company Profile updated successfully!',
         });
 
-
+        if (isEditMode) {
+          navigation.goBack();
+        } else {
+          setIsCompleted(true);
+        }
         return;
       }
 
@@ -188,9 +190,21 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleCompleteLater = () => {
-    if (role === 'candidate') navigation.replace('CandidateHome');
-    else navigation.replace('ManagerHome');
-  }
+    Alert.alert(
+      'Complete Later?',
+      'You can always complete your profile from Settings. An incomplete profile may limit your visibility.',
+      [
+        { text: 'Stay', style: 'cancel' },
+        {
+          text: 'Go to Home',
+          onPress: () => {
+            if (role === 'candidate') navigation.replace('CandidateHome');
+            else navigation.replace('ManagerHome');
+          },
+        },
+      ]
+    );
+  };
 
   const handleGoHome = () => {
     if (role === 'candidate') navigation.replace('CandidateHome');
@@ -278,15 +292,17 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                 />
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={handleCompleteLater} activeOpacity={0.7}>
-                <Text style={styles.completeLaterText}>Complete Later</Text>
-              </TouchableOpacity>
+              {!isEditMode && (
+                <TouchableOpacity onPress={handleCompleteLater} activeOpacity={0.7}>
+                  <Text style={styles.completeLaterText}>Complete Later</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Progress Section */}
             <Animated.View entering={FadeInDown.duration(300)} style={styles.progressSection}>
               <View style={styles.progressHeader}>
-                <Text style={styles.progressTitle}>{'Complete Your Profile'}</Text>
+                <Text style={styles.progressTitle}>{isEditMode ? 'Update Your Profile' : 'Complete Your Profile'}</Text>
                 <View style={styles.progressBadge}>
                   <Text style={styles.progressBadgeText}>{progressPercent}%</Text>
                 </View>
@@ -310,7 +326,6 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   onSkipStep={handleSkipStep}
                   saving={saving}
                   totalSteps={totalSteps}
-                  initialData={initialUserData}
                 />
               ) : (
                 <ManagerProfileSteps
@@ -321,7 +336,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   onSkipStep={handleSkipStep}
                   saving={saving}
                   totalSteps={totalSteps}
-        
+                  initialData={initialData}
                 />
               )}
             </View>
@@ -494,4 +509,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CompleteProfileScreen;
+export default UpdateCompanyProfileScreen;

@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, StatusBar, View, TouchableOpacity, Modal, Text, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, ToastAndroid, Alert } from 'react-native';
+import { StyleSheet, ScrollView, StatusBar, View, TouchableOpacity, Modal, Text, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, ToastAndroid, Alert, RefreshControl } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { Colors } from '../../theme/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MainManagerHeader from '../../components/Manager_component/MainManagerHeader';
-import {  X, Plus, Edit3, AlertCircle, ChevronRight } from 'lucide-react-native';
+import { X, Plus, Edit3, AlertCircle, ChevronRight } from 'lucide-react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CandidateProfileCompletenessBanner from '../../components/Manager_component/CandidateProfileCompletenessBanner';
+import { getCandidateProfileCompleteness } from '../../utils/candidateProfileCompleteness';
+
+import { useDispatch } from 'react-redux';
+import { getProfileSlice, updateProfileSlice } from '../../redux/CandidateProfileSlice';
 
 import {
   ProfileHeaderInfo,
@@ -21,25 +27,33 @@ import {
   PersonalDetailsCard,
 } from './CandidateProfileComponents';
 import { candidateProfile } from '../../data/jobonnStaticData';
-
-const CustomInput = ({ label, value, onChangeText, placeholder }: any) => (
-  <View style={styles.inputWrap}>
-    <Text style={styles.inputLabel}>{label}</Text>
-    <TextInput
-      style={styles.input}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor={Colors.textTertiary}
-    />
-  </View>
-);
+import { normalizeCandidateProfile, buildProfilePayload, formatYear, parseYear, parseDOB } from '../../utils/candidateProfileUtils';
+import {
+  ProfileInfoForm,
+  ProfessionalDetailsForm,
+  SkillsForm,
+  ExperienceForm,
+  EducationForm,
+  PersonalDetailsForm,
+  SummaryForm,
+  CareerPreferenceForm,
+  LanguagesForm,
+  DocumentsForm
+} from '../../components/Candidate_component/CandidateProfileForms';
 
 const CandidateProfileScreen = ({ navigation }: any) => {
+  const dispatch = useDispatch();
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProfile();
+    setRefreshing(false);
+  };
 
   // Dynamic DATA
   const [user, setUser] = useState<any>({
@@ -49,46 +63,147 @@ const CandidateProfileScreen = ({ navigation }: any) => {
     candidate_profile: {},
   });
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   const fetchProfile = async () => {
     try {
-      setLoading(true);
-      // const res = await GetUser({});
-      // if (res && res.user) {
-      //   setUser(res.user);
-      // }
-
-      setUser(candidateProfile);
+      // 1. Immediately load local cached profile for fast display
+      const data = await AsyncStorage.getItem('userData');
+      if (data) {
+        setUser(JSON.parse(data));
+      } else {
+        setUser(candidateProfile);
+      }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      ToastAndroid.show('Failed to load profile', ToastAndroid.SHORT);
+      console.error('Error fetching cached profile:', error);
     } finally {
       setLoading(false);
     }
+
+    // 2. Fetch fresh profile from the backend
+    try {
+      const response = await dispatch(getProfileSlice() as any).unwrap();
+      console.log('Fetched fresh profile successfully:', response);
+      if (response && response.status && response.candidate) {
+        const candidate = response.candidate;
+        const userObj = candidate.user || {};
+        const mappedUser = {
+          ...userObj,
+          candidate: candidate,
+          role: userObj.role || 'candidate',
+        };
+        // Save to cache
+        await AsyncStorage.setItem('userData', JSON.stringify(mappedUser));
+        // Update local state
+        setUser(mappedUser);
+      }
+    } catch (apiError) {
+      console.error('Error calling get-profile API via Redux:', apiError);
+    }
   };
 
-  const profile = user?.candidate_profile || {};
+  useEffect(() => {
+    fetchProfile();
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchProfile();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const { normalizedProfile, normalizedPersonalDetails } = normalizeCandidateProfile(user);
+
 
   const [editData, setEditData] = useState<any>({});
   const [newSkill, setNewSkill] = useState('');
 
   const openModal = (section: string) => {
     setActiveSection(section);
+    const cand = user?.candidate || {};
+    const personal = cand.personal_detail || {};
+
+    const professional = cand.professional_detail || {};
+    const career = cand.career_preference || {};
+    const educationsList = cand.educations || cand.education || [];
+    const firstEdu = educationsList[0] || {};
+    const skillsList = cand.skills || [];
+    const docsObj = cand.docs || {};
+
     setEditData({
-      ...user.candidate_profile,
+      // Profile Info
       name: user.name || '',
       email: user.email || '',
       phone: user.phone || '',
-      dateOfBirth: user.PersonalDetails?.date_of_birth || '',
-      gender: user.PersonalDetails?.gender || '',
-      maritalStatus: user.PersonalDetails?.status || '',
-      hometown: user.PersonalDetails?.current_address || '',
-      work_experience: user.candidate_profile?.work_experience ? [...user.candidate_profile.work_experience] : [],
-      education: user.candidate_profile?.education ? [...user.candidate_profile.education] : [],
-      skills: user.candidate_profile?.skills ? [...user.candidate_profile.skills] : []
+      job_title: professional.job_title || cand.designation || '',
+      current_location: cand.current_location || personal.city || '',
+
+      // Professional Details
+      current_company: professional.current_company || '',
+      experience_level: professional.experience_level || '',
+      exp_years: professional.exp_years !== undefined ? String(professional.exp_years) : '',
+      exp_months: professional.exp_months !== undefined ? String(professional.exp_months) : '',
+      ctc: professional.ctc !== undefined ? String(professional.ctc) : '',
+      expected_salary: career.expected_salary !== undefined ? String(career.expected_salary) : '',
+      notice_period: career.notice_period || '',
+      preferred_job_types: Array.isArray(career.preferred_job_types)
+        ? career.preferred_job_types
+        : (typeof career.preferred_job_types === 'string' && career.preferred_job_types.trim()
+          ? career.preferred_job_types.split(',').map((s: string) => s.trim())
+          : []),
+      preferred_location: career.preferred_location || '',
+      availability: career.availability || '',
+      profile_summery: professional.profile_summery || '',
+
+      // Skills (array of strings)
+      skills: skillsList.map((s: any) => typeof s === 'string' ? s : (s.skill || s.skill_name || '')),
+
+      // Experience (array of objects)
+      work_experience: cand.work_experience ? [...cand.work_experience] : [],
+
+      // Education (single education keys for API matching completeprofile)
+      highest_qualification: firstEdu.highest_qualification || cand.highest_qualification || '',
+      institute_name: firstEdu.institute_name || cand.institute_name || '',
+      passing_year: (firstEdu.passing_year || cand.passing_year) ? parseYear(String(firstEdu.passing_year || cand.passing_year)) : null,
+      percentage_cgpa: firstEdu.percentage_cgpa || cand.percentage_cgpa || '',
+
+      // Personal Details
+      dob: personal.dob ? parseDOB (personal.dob) : null,
+      gender: personal.gender || '',
+      marital_status: personal.marital_status || '',
+      city: personal.city || '',
+      state: personal.state || '',
+
+      // Languages
+      languages: (cand.languages || []).map((l: any) => {
+        if (typeof l === 'string') {
+          return {
+            language_name: l,
+            proficiency: '',
+            comfortable_in: '',
+          };
+        }
+        return {
+          language_name: l.language_name || l.language || l.name || '',
+          proficiency: l.proficiency || '',
+          comfortable_in: Array.isArray(l.comfortable_in)
+            ? l.comfortable_in.join(', ')
+            : (l.comfortable_in || ''),
+        };
+      }),
+
+      // Documents
+      profileImage: (docsObj.profile_img || cand.profile_img || cand.profile_image) ? {
+        uri: String(docsObj.profile_img || cand.profile_img || cand.profile_image).startsWith('http')
+          ? String(docsObj.profile_img || cand.profile_img || cand.profile_image)
+          : `https://admin.jobonn.in/storage/${docsObj.profile_img || cand.profile_img || cand.profile_image}`,
+        name: 'profile_image.jpg',
+        type: 'image/jpeg',
+      } : null,
+      resume: (docsObj.resume || cand.resume) ? {
+        uri: String(docsObj.resume || cand.resume).startsWith('http')
+          ? String(docsObj.resume || cand.resume)
+          : `https://admin.jobonn.in/storage/${docsObj.resume || cand.resume}`,
+        name: String(docsObj.resume || cand.resume).split('/').pop() || 'resume.pdf',
+        type: 'application/pdf',
+      } : null,
+      portfolio: docsObj.portfolio_link || cand.portfolio_link || cand.portfolio || '',
     });
   };
 
@@ -98,27 +213,21 @@ const CandidateProfileScreen = ({ navigation }: any) => {
   };
 
   const saveChanges = async () => {
+    if (!activeSection) return;
     try {
       setSaving(true);
+      const cand = user?.candidate || {};
+      let payload = buildProfilePayload(activeSection as string, editData, cand);
 
-      setUser({
-        ...user,
-        name: editData.name || user.name,
-        email: editData.email || user.email,
-        phone: editData.phone || user.phone,
-        PersonalDetails: {
-          ...user.PersonalDetails,
-          date_of_birth: editData.dateOfBirth,
-          gender: editData.gender,
-          status: editData.maritalStatus,
-          current_address: editData.hometown,
-        },
-        candidate_profile: {
-          ...user.candidate_profile,
-          ...editData,
-        }
-      });
-      ToastAndroid.show('Progress saved! (Mock)', ToastAndroid.SHORT);
+      console.log('Dispatching profile update with payload:', payload);
+
+      const res = await dispatch(updateProfileSlice(payload) as any).unwrap();
+      console.log("response", res);
+
+      // Fetch fresh profile from backend to update state and storage cache
+      await fetchProfile();
+
+      ToastAndroid.show('Profile updated successfully!', ToastAndroid.SHORT);
       closeModal();
     } catch (error: any) {
       console.error('Update failed:', error);
@@ -128,22 +237,6 @@ const CandidateProfileScreen = ({ navigation }: any) => {
     }
   };
 
-  const removeSkill = (skillToRemove: string) => {
-    setEditData({
-      ...editData,
-      skills: editData.skills.filter((s: string) => s !== skillToRemove)
-    });
-  };
-
-  const addSkill = () => {
-    if (newSkill.trim()) {
-      setEditData({
-        ...editData,
-        skills: [...(editData.skills || []), newSkill.trim()]
-      });
-      setNewSkill('');
-    }
-  };
 
   const updateExperience = (index: number, key: string, value: string) => {
     const updatedExp = [...editData.work_experience];
@@ -165,148 +258,37 @@ const CandidateProfileScreen = ({ navigation }: any) => {
     });
   };
 
-  const updateEducation = (index: number, key: string, value: string) => {
-    const updatedEdu = [...editData.education];
-    updatedEdu[index] = { ...updatedEdu[index], [key]: value };
-    setEditData({ ...editData, education: updatedEdu });
-  };
 
-  const addEducation = () => {
+
+  const removeLanguage = (index: number) => {
     setEditData({
       ...editData,
-      education: [...(editData.education || []), { degree: '', school: '', endDate: '' }]
-    });
-  };
-
-  const removeEducation = (index: number) => {
-    setEditData({
-      ...editData,
-      education: editData.education.filter((_: any, i: number) => i !== index)
+      languages: editData.languages.filter((_: any, i: number) => i !== index)
     });
   };
 
   const renderModalContent = () => {
     switch (activeSection) {
       case 'profile':
-        return (
-          <>
-            <CustomInput label="Full Name" value={editData.name} onChangeText={(text: string) => setEditData({ ...editData, name: text })} placeholder="Enter name" />
-            <CustomInput label="Job Title" value={editData.jobTitle} onChangeText={(text: string) => setEditData({ ...editData, jobTitle: text })} placeholder="Enter job title" />
-            <CustomInput label="Location" value={editData.currentLocation} onChangeText={(text: string) => setEditData({ ...editData, currentLocation: text })} placeholder="Enter location" />
-            <CustomInput label="Email" value={editData.email} onChangeText={(text: string) => setEditData({ ...editData, email: text })} placeholder="Enter email" />
-            <CustomInput label="Phone" value={editData.phone} onChangeText={(text: string) => setEditData({ ...editData, phone: text })} placeholder="Enter phone" />
-          </>
-        );
+        return <ProfileInfoForm editData={editData} setEditData={setEditData} />;
       case 'professional':
-        return (
-          <>
-            <CustomInput label="Current Company" value={editData.currentCompany} onChangeText={(text: string) => setEditData({ ...editData, currentCompany: text })} placeholder="Enter current company" />
-            <CustomInput label="Total Experience" value={editData.totalExperience} onChangeText={(text: string) => setEditData({ ...editData, totalExperience: text })} placeholder="e.g. 2 Years" />
-            <CustomInput label="Current CTC" value={editData.currentCTC} onChangeText={(text: string) => setEditData({ ...editData, currentCTC: text })} placeholder="e.g. ₹8 LPA" />
-            <CustomInput label="Expected Salary" value={editData.expectedSalary} onChangeText={(text: string) => setEditData({ ...editData, expectedSalary: text })} placeholder="e.g. ₹12 LPA" />
-            <CustomInput label="Notice Period" value={editData.noticePeriod} onChangeText={(text: string) => setEditData({ ...editData, noticePeriod: text })} placeholder="e.g. 30 Days" />
-            <CustomInput label="Preferred Job Type" value={editData.jobType} onChangeText={(text: string) => setEditData({ ...editData, jobType: text })} placeholder="e.g. Full-time, Remote" />
-            <CustomInput label="Current Location" value={editData.currentLocation} onChangeText={(text: string) => setEditData({ ...editData, currentLocation: text })} placeholder="e.g. Jaipur" />
-          </>
-        );
+        return <ProfessionalDetailsForm editData={editData} setEditData={setEditData} />;
       case 'skills':
-        return (
-          <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: hp('2%') }}>
-              <View style={{ flex: 1, marginRight: wp('2%') }}>
-                <TextInput
-                  style={styles.input}
-                  value={newSkill}
-                  onChangeText={setNewSkill}
-                  placeholder="Add a new skill"
-                  placeholderTextColor={Colors.textTertiary}
-                  onSubmitEditing={addSkill}
-                />
-              </View>
-              <TouchableOpacity onPress={addSkill} style={styles.addBtn}>
-                <Plus size={RFValue(12)} color={Colors.white} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: wp('2%') }}>
-              {(editData.skills || []).map((skill: string, idx: number) => (
-                <View key={idx} style={styles.editSkillBadge}>
-                  <Text style={styles.editSkillText}>{skill}</Text>
-                  <TouchableOpacity onPress={() => removeSkill(skill)} style={{ marginLeft: wp('1%') }}>
-                    <X size={RFValue(8)} color={Colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </>
-        );
+        return <SkillsForm editData={editData} setEditData={setEditData} />;
       case 'experience':
-        return (
-          <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: hp('1.5%') }}>
-              <Text style={{ fontSize: RFValue(11), fontWeight: '700', color: Colors.textPrimary }}>Work Experience</Text>
-              <TouchableOpacity onPress={addExperience} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary, paddingHorizontal: wp('2%'), paddingVertical: hp('0.5%'), borderRadius: 6 }}>
-                <Plus size={RFValue(9)} color={Colors.white} />
-                <Text style={{ color: Colors.white, fontSize: RFValue(9), marginLeft: wp('1%'), fontWeight: '600' }}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            {(editData.work_experience || []).map((exp: any, index: number) => (
-              <View key={index} style={{ backgroundColor: '#F9FAFB', padding: wp('3%'), borderRadius: 12, marginBottom: hp('1.5%'), borderWidth: 1, borderColor: '#E5E7EB' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: hp('1%') }}>
-                  <Text style={{ fontSize: RFValue(9.5), fontWeight: '700', color: Colors.textSecondary }}>Experience #{index + 1}</Text>
-                  <TouchableOpacity onPress={() => removeExperience(index)}>
-                    <Text style={{ color: Colors.danger, fontSize: RFValue(9), fontWeight: '600' }}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-                <CustomInput label="Job Title" value={exp.position} onChangeText={(text: string) => updateExperience(index, 'position', text)} placeholder="Enter job title" />
-                <CustomInput label="Company Name" value={exp.company} onChangeText={(text: string) => updateExperience(index, 'company', text)} placeholder="Enter company name" />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1, marginRight: wp('1.5%') }}>
-                    <CustomInput label="Start Date" value={exp.startDate} onChangeText={(text: string) => updateExperience(index, 'startDate', text)} placeholder="e.g. 2020" />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: wp('1.5%') }}>
-                    <CustomInput label="End Date" value={exp.endDate} onChangeText={(text: string) => updateExperience(index, 'endDate', text)} placeholder="e.g. Present" />
-                  </View>
-                </View>
-              </View>
-            ))}
-          </>
-        );
+        return <ExperienceForm editData={editData} setEditData={setEditData} updateExperience={updateExperience} addExperience={addExperience} removeExperience={removeExperience} />;
       case 'education':
-        return (
-          <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: hp('1.5%') }}>
-              <Text style={{ fontSize: RFValue(11), fontWeight: '700', color: Colors.textPrimary }}>Education</Text>
-              <TouchableOpacity onPress={addEducation} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary, paddingHorizontal: wp('2%'), paddingVertical: hp('0.5%'), borderRadius: 6 }}>
-                <Plus size={RFValue(9)} color={Colors.white} />
-                <Text style={{ color: Colors.white, fontSize: RFValue(9), marginLeft: wp('1%'), fontWeight: '600' }}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            {(editData.education || []).map((edu: any, index: number) => (
-              <View key={index} style={{ backgroundColor: '#F9FAFB', padding: wp('3%'), borderRadius: 12, marginBottom: hp('1.5%'), borderWidth: 1, borderColor: '#E5E7EB' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: hp('1%') }}>
-                  <Text style={{ fontSize: RFValue(9.5), fontWeight: '700', color: Colors.textSecondary }}>Education #{index + 1}</Text>
-                  <TouchableOpacity onPress={() => removeEducation(index)}>
-                    <Text style={{ color: Colors.danger, fontSize: RFValue(9), fontWeight: '600' }}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-                <CustomInput label="Degree / Course" value={edu.degree} onChangeText={(text: string) => updateEducation(index, 'degree', text)} placeholder="e.g. BCA in Computer Science" />
-                <CustomInput label="Institution" value={edu.school} onChangeText={(text: string) => updateEducation(index, 'school', text)} placeholder="e.g. Rajasthan University" />
-                <CustomInput label="Passing Year" value={edu.endDate} onChangeText={(text: string) => updateEducation(index, 'endDate', text)} placeholder="e.g. 2024" />
-              </View>
-            ))}
-          </>
-        );
+        return <EducationForm editData={editData} setEditData={setEditData} />;
       case 'personal':
-        return (
-          <>
-            <CustomInput label="Date of Birth" value={editData.dateOfBirth} onChangeText={(text: string) => setEditData({ ...editData, dateOfBirth: text })} placeholder="e.g. 01-01-2000" />
-            <CustomInput label="Gender" value={editData.gender} onChangeText={(text: string) => setEditData({ ...editData, gender: text })} placeholder="e.g. Male" />
-            <CustomInput label="Marital Status" value={editData.maritalStatus} onChangeText={(text: string) => setEditData({ ...editData, maritalStatus: text })} placeholder="e.g. Single" />
-            <CustomInput label="Home Town" value={editData.hometown} onChangeText={(text: string) => setEditData({ ...editData, hometown: text })} placeholder="e.g. Jaipur" />
-          </>
-        );
+        return <PersonalDetailsForm editData={editData} setEditData={setEditData} />;
+      case 'summary':
+        return <SummaryForm editData={editData} setEditData={setEditData} />;
+      case 'career':
+        return <CareerPreferenceForm editData={editData} setEditData={setEditData} />;
+      case 'languages':
+        return <LanguagesForm editData={editData} setEditData={setEditData} removeLanguage={removeLanguage} />;
+      case 'documents':
+        return <DocumentsForm editData={editData} setEditData={setEditData} />;
       default:
         return null;
     }
@@ -317,9 +299,15 @@ const CandidateProfileScreen = ({ navigation }: any) => {
     professional: "Edit Professional Details",
     skills: "Manage Skills",
     experience: "Add/Edit Experience",
-    education: "Add/Edit Education"
+    education: "Add/Edit Education",
+    personal: "Edit Personal Details",
+    summary: "Edit Profile Summary",
+    career: "Edit Career Preferences",
+    languages: "Manage Languages",
+    documents: "Edit Profile & Documents"
   };
 
+  const completeness = getCandidateProfileCompleteness(user || candidateProfile);
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -341,39 +329,28 @@ const CandidateProfileScreen = ({ navigation }: any) => {
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
+          }
+        >
 
           {/* Incomplete Profile Banner */}
-          {user && !user.profile_completed && (
-            <TouchableOpacity
-              style={styles.profileBanner}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('CompleteProfile', { role: 'candidate' })}
-            >
-              <View style={styles.profileBannerContent}>
-                <View style={styles.profileBannerIconBg}>
-                  <AlertCircle size={RFValue(12)} color={Colors.warning} />
-                </View>
-                <View style={styles.profileBannerTextWrap}>
-                  <Text style={styles.profileBannerTitle}>Complete Your Profile</Text>
-                  <Text style={styles.profileBannerSub}>A complete profile helps you stand out to recruiters.</Text>
-                </View>
-                <ChevronRight size={RFValue(12)} color={Colors.warning} />
-              </View>
-            </TouchableOpacity>
-          )}
+          <CandidateProfileCompletenessBanner user={user} navigation={navigation} />
 
-          <ProfileHeaderInfo user={user} profile={profile} onEdit={() => openModal('profile')} />
+          <ProfileHeaderInfo user={user} profile={normalizedProfile} completenessValue={completeness.percentage} onEdit={() => openModal('documents')} />
           <StatsRow />
-          <ResumeCard />
-          <ProfileSummaryCard profile={profile} />
-          <CareerPreferenceCard profile={profile} />
-          <ProfessionalDetailsCard profile={profile} onEdit={() => openModal('professional')} />
-          <SkillsCard profile={profile} onEdit={() => openModal('skills')} />
-          <ExperienceCard profile={profile} onEdit={() => openModal('experience')} />
-          <EducationCard profile={profile} onEdit={() => openModal('education')} />
-          <LanguagesCard profile={profile} />
-          <PersonalDetailsCard personalDetails={user?.PersonalDetails} onEdit={() => openModal('personal')} />
+          <ResumeCard user={user} profile={normalizedProfile} onEdit={() => openModal('documents')} />
+          <ProfileSummaryCard profile={normalizedProfile} onEdit={() => openModal('summary')} />
+          <CareerPreferenceCard profile={normalizedProfile} onEdit={() => openModal('career')} />
+          <ProfessionalDetailsCard profile={normalizedProfile} onEdit={() => openModal('professional')} />
+          <SkillsCard profile={normalizedProfile} onEdit={() => openModal('skills')} />
+          <ExperienceCard profile={normalizedProfile} onEdit={() => openModal('experience')} />
+          <EducationCard profile={normalizedProfile} onEdit={() => openModal('education')} />
+          <LanguagesCard profile={normalizedProfile} onEdit={() => openModal('languages')} />
+          <PersonalDetailsCard personalDetails={normalizedPersonalDetails} onEdit={() => openModal('personal')} />
           {/* <RecentActivitySection /> */}
 
           <View style={{ height: hp('9%') }} />
@@ -459,14 +436,9 @@ const styles = StyleSheet.create({
   topActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: wp('1.5%'), marginBottom: hp('0.8%') },
   iconBtn: { backgroundColor: Colors.white, padding: wp('1.5%'), borderRadius: wp('2%'), borderWidth: 1, borderColor: Colors.border },
 
-  // Input styles
-  inputWrap: { marginBottom: hp('1.5%') },
-  inputLabel: { fontSize: RFValue(9), color: Colors.textSecondary, marginBottom: hp('0.5%'), fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: Colors.border, borderRadius: wp('2%'), paddingHorizontal: wp('3%'), paddingVertical: hp('1%'), fontSize: RFValue(10), color: Colors.textPrimary, backgroundColor: Colors.white },
-
   // Modal styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: Colors.white, borderTopLeftRadius: wp('5%'), borderTopRightRadius: wp('5%'), padding: wp('4%'), maxHeight: hp('80%') },
+  modalContent: { backgroundColor: Colors.white, borderTopLeftRadius: wp('5%'), borderTopRightRadius: wp('5%'), padding: wp('3%'), maxHeight: hp('80%') },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: hp('2%') },
   modalTitle: { fontSize: RFValue(12), fontWeight: '700', color: Colors.textPrimary },
   closeBtn: { padding: wp('1%'), backgroundColor: Colors.borderLight, borderRadius: wp('2%') },

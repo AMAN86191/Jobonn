@@ -53,7 +53,7 @@ const DatePickerInput: React.FC<DatePickerInputProps> = ({ label, value, onChang
         onCancel={() => {
           setOpen(false);
         }}
-        theme="light"
+        theme="dark"
         buttonColor={Colors.black}
       />
     </View>

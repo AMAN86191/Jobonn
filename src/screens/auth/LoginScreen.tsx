@@ -31,6 +31,7 @@ import { useDispatch } from 'react-redux';
 import { LoginSlice } from '../../redux/AuthSlice';
 import Toast from 'react-native-toast-message';
 import { candidateProfile, recruiterProfile } from '../../data/jobonnStaticData';
+import { getProfileCompleteness } from '../../utils/profileCompleteness';
 
 
 
@@ -130,10 +131,20 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
           await AsyncStorage.setItem('userToken', res.token);
         }
         if (res?.company) {
+          const completeness = getProfileCompleteness(res.company);
           const userData = {
             ...(res.user || {}),
             company: res.company,
-            profile_completed: true,
+            profile_completed: completeness.isComplete,
+          };
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        } else if (res?.candidate || res?.user?.candidate || res?.user?.role === 'candidate' || res?.role === 'candidate') {
+          const candObj = res.candidate || res.user?.candidate;
+          const userData = {
+            ...(res.user || {}),
+            candidate: candObj,
+            role: 'candidate',
+            profile_completed: !!(candObj?.designation || candObj?.profile_summery || candObj?.profile_summary),
           };
           await AsyncStorage.setItem('userData', JSON.stringify(userData));
         } else if (res?.user) {

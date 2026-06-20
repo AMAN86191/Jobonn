@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { getCompanyPackagesSlice } from '../../redux/CompanyHomeSlice';
+import { getCompanyPackagesSlice, packagePurchaseSlice } from '../../redux/CompanyHomeSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { RFValue } from 'react-native-responsive-fontsize';
-import { Briefcase, Building2, Check, CreditCard, ShieldCheck, Users, Crown } from 'lucide-react-native';
+import { Briefcase, Building2, Check, CreditCard, ShieldCheck, Users, Crown, ArrowLeft, Calendar, Headphones, MapPin, FileText, Gift, Lock, ChevronRight } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
+import LinearGradient from 'react-native-linear-gradient';
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
 
 
@@ -50,35 +52,87 @@ const PackageManagementScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [currentPlan, setCurrentPlan] = useState<any>(null);
 
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
 
-  const fetchPackages = async () => {
-    setLoading(true);
+  const fetchPackages = async (isPullToRefresh = false) => {
+    if (!isPullToRefresh) setLoading(true);
     try {
       const response = await dispatch(getCompanyPackagesSlice() as any).unwrap();
-      console.log('response', response);
-      const data = response?.data || response || [];
+      console.log('fetchPackages response:', response);
+      const data = response?.packages?.data || response?.data || response || [];
       setPackages(data);
+
+      if (response?.purchased_packages) {
+        setCurrentPlan(response.purchased_packages[0]);
+      } else {
+        setCurrentPlan(null);
+      }
     } catch (error) {
-      console.log('error', error);
+      console.log('error fetching packages:', error);
     } finally {
-      setLoading(false);
+      if (!isPullToRefresh) setLoading(false);
     }
   };
 
-  const handlePurchase = (item: any) => {
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPackages(true);
+    setRefreshing(false);
+  };
+
+
+  const handlePurchase = async (item: any) => {
     console.log('Purchase requested for package:', item);
-    Toast.show({
-      type: 'success',
-      text1: 'Purchase Initiated',
-      text2: `Starting purchase process for ${item.package_name || 'Package'}`,
-    });
+    let companyId = null;
+    try {
+      const storedUser = await AsyncStorage.getItem('userData');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        companyId = parsed.company_id || parsed.company?.id || parsed.id || 3;
+      }
+    } catch (err) {
+      console.log('Error reading company_id from AsyncStorage', err);
+    }
+
+    const payload = {
+      company_id: Number(companyId),
+      package_id: Number(item.id),
+      price_paid: Number(item.price || 0),
+      duration_in_months: Number(item.duration_in_months || 0),
+      transaction_id: "TXN_20260610123456"
+    };
+
+    console.log('Purchase payload:', payload);
+
+    try {
+      const response = await dispatch(packagePurchaseSlice(payload) as any).unwrap();
+      console.log('response', response);
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Package purchased successfully!',
+      });
+      fetchPackages();
+    } catch (error) {
+      console.log('error', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Purchase Failed',
+        text2: typeof error === 'string' ? error : 'Something went wrong',
+      });
+    }
   };
 
   useEffect(() => {
     fetchPackages();
-  }, [dispatch]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchPackages();
+    });
+    return unsubscribe;
+  }, [navigation, dispatch]);
 
   useEffect(() => {
     if (packages.length > 0 && selectedPackageId === null) {
@@ -86,142 +140,316 @@ const PackageManagementScreen = ({ navigation }: any) => {
     }
   }, [packages, selectedPackageId]);
 
+  const formatRenewalDate = (dateStr: string) => {
+    if (!dateStr) return '12 Jun 2026';
+    try {
+      const date = new Date(dateStr);
+      const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+      return date.toLocaleDateString('en-GB', options);
+    } catch (e) {
+      return '12 Jun 2026';
+    }
+  };
 
+  const formatLimitValue = (val: any, packageName: string) => {
+    if (packageName.toLowerCase().includes('platinum')) {
+      return 'Unlimited';
+    }
+    if (val === null || val === undefined || val === -1 || val === 9999 || val === 0) {
+      if (val === 0) return '0';
+      return 'Unlimited';
+    }
+    return String(val);
+  };
+
+
+
+  // Find current active package data
+  const activePackage = currentPlan?.package || null;
+
+  const renewalDate = formatRenewalDate(currentPlan?.expiry_date || currentPlan?.expires_at);
+
+  const jobsTotal = activePackage?.no_of_job_post || 10;
+  const jobsUsed = Math.min(6, jobsTotal);
+
+  const locationsTotal = activePackage?.no_of_location || 5;
+  const locationsUsed = Math.min(2, locationsTotal);
+
+  const usersTotal = activePackage?.no_of_users || 10;
+  const usersUsed = Math.min(4, usersTotal);
+
+  const profilesTotal = activePackage?.no_of_profile || 5;
+  const profilesUsed = Math.min(3, profilesTotal);
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
-      <CommanManagerHeader title="Package Management" navigation={navigation} onBack={() => navigation.goBack()} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {/* <View style={styles.creditCard}>
-          <View style={styles.creditHeader}>
-            <View style={styles.creditTitleRow}>
-              <CreditCard size={RFValue(14)} color={Colors.primary} />
-              <Text style={styles.creditTitle}>Contact Unlock Credits</Text>
+      <CommanManagerHeader title='Package Management' navigation={navigation} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
+        {/* Dynamic Current Plan Card (Gradient Background) */}
+        {!currentPlan || currentPlan?.status !== 'active' ? (
+          <LinearGradient
+            colors={[Colors.primary, Colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.currentPlanCard}
+          >
+            <View style={styles.currentPlanMain}>
+              <View style={styles.currentPlanLeft}>
+                <View style={styles.currentPlanIconContainer}>
+                  <Building2 size={RFValue(18)} color={Colors.white} />
+                </View>
+                <View style={styles.currentPlanDetails}>
+                  <Text style={styles.currentPlanName}>No Active Plan</Text>
+                  <Text style={[styles.currentPlanDuration, { color: 'rgba(255,255,255,0.85)' }]}>
+                    Subscribe to a plan below to start hiring talent.
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Text style={styles.creditPill}>{contactCredits.remaining} remaining</Text>
+          </LinearGradient>
+        ) : (
+          <LinearGradient
+            colors={[Colors.primary, Colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.currentPlanCard}
+          >
+            <View style={styles.currentPlanHeader}>
+              <View style={styles.currentBadge}>
+                <Check size={RFValue(8)} color={Colors.primary} strokeWidth={3} />
+                <Text style={styles.currentBadgeText}>CURRENT PLAN</Text>
+              </View>
+            </View>
+
+            <View style={styles.currentPlanMain}>
+              <View style={styles.currentPlanLeft}>
+                <View style={styles.currentPlanIconContainer}>
+                  <Building2 size={RFValue(18)} color={Colors.white} />
+                </View>
+                <View style={styles.currentPlanDetails}>
+                  <Text style={styles.currentPlanName}>{activePackage?.package_name || 'Silver Package'}</Text>
+                  <Text style={styles.currentPlanDuration}>{activePackage?.duration_in_months || 1} Month Plan</Text>
+                  <View style={styles.currentPlanRenewalRow}>
+                    <Calendar size={RFValue(8)} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.currentPlanRenewalText}>Expires on {renewalDate}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.currentPlanRight}>
+                <Text style={styles.currentPlanPrice}>₹{parseFloat(currentPlan?.price_paid || activePackage?.price || '299')}</Text>
+                <Text style={styles.currentPlanPriceSub}>/{activePackage?.duration_in_months === 12 ? 'year' : 'month'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.currentPlanGrid}>
+              {/* Job Posts */}
+              <View style={styles.currentPlanGridCol}>
+                <View style={styles.currentPlanGridIconCircle}>
+                  <Briefcase size={RFValue(10)} color={Colors.white} />
+                </View>
+                <Text style={styles.currentPlanGridValue}>{jobsUsed} / {jobsTotal}</Text>
+                <Text style={styles.currentPlanGridLabel}>Job Posts</Text>
+                <View style={styles.currentProgressTrack}>
+                  <View style={[styles.currentProgressFill, { width: `${(jobsUsed / jobsTotal) * 100}%` }]} />
+                </View>
+              </View>
+
+              {/* Locations */}
+              <View style={styles.currentPlanGridCol}>
+                <View style={styles.currentPlanGridIconCircle}>
+                  <MapPin size={RFValue(10)} color={Colors.white} />
+                </View>
+                <Text style={styles.currentPlanGridValue}>{locationsUsed} / {locationsTotal}</Text>
+                <Text style={styles.currentPlanGridLabel}>Locations</Text>
+                <View style={styles.currentProgressTrack}>
+                  <View style={[styles.currentProgressFill, { width: `${(locationsUsed / locationsTotal) * 100}%` }]} />
+                </View>
+              </View>
+
+              {/* Users */}
+              <View style={styles.currentPlanGridCol}>
+                <View style={styles.currentPlanGridIconCircle}>
+                  <Users size={RFValue(10)} color={Colors.white} />
+                </View>
+                <Text style={styles.currentPlanGridValue}>{usersUsed} / {usersTotal}</Text>
+                <Text style={styles.currentPlanGridLabel}>Users</Text>
+                <View style={styles.currentProgressTrack}>
+                  <View style={[styles.currentProgressFill, { width: `${(usersUsed / usersTotal) * 100}%` }]} />
+                </View>
+              </View>
+
+              {/* Profiles */}
+              <View style={styles.currentPlanGridCol}>
+                <View style={styles.currentPlanGridIconCircle}>
+                  <FileText size={RFValue(10)} color={Colors.white} />
+                </View>
+                <Text style={styles.currentPlanGridValue}>{profilesUsed} / {profilesTotal}</Text>
+                <Text style={styles.currentPlanGridLabel}>Profiles</Text>
+                <View style={styles.currentProgressTrack}>
+                  <View style={[styles.currentProgressFill, { width: `${(profilesUsed / profilesTotal) * 100}%` }]} />
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        )}
+
+        {/* Secure Trust Bar */}
+        <View style={styles.trustBar}>
+          <View style={styles.trustItem}>
+            <ShieldCheck size={RFValue(11)} color={Colors.primary} />
+            <Text style={styles.trustText}>Secure Payments</Text>
           </View>
-          <View style={styles.creditProgressTrack}>
-            <View style={[styles.creditProgressFill, { width: `${(contactCredits.used / contactCredits.total) * 100}%` }]} />
+          <View style={styles.trustDivider} />
+          <View style={styles.trustItem}>
+            <Check size={RFValue(11)} color={Colors.primary} />
+            <Text style={styles.trustText}>Instant Activation</Text>
           </View>
-          <Text style={styles.creditSub}>{contactCredits.used} used from {contactCredits.total}. Credits deduct only when contact details are unlocked.</Text>
-        </View> */}
+          <View style={styles.trustDivider} />
+          <View style={styles.trustItem}>
+            <Headphones size={RFValue(11)} color={Colors.primary} />
+            <Text style={styles.trustText}>Priority Support</Text>
+          </View>
+        </View>
 
 
+
+        {/* Plan Cards List */}
         {loading && packages.length === 0 ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: hp('30%') }}>
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
         ) : (
-          packages.map((item: any) => {
+          packages
+            .map((item: any) => {
+              const isMostPopular = item.package_name.toLowerCase().includes('silver');
+              const isActivePlan = currentPlan?.package_id === item.id;
+              const theme = getTierTheme(item.package_name || '');
+              const Icon = theme.icon;
 
-            const theme = getTierTheme(item.package_name || '');
-            const Icon = theme.icon;
+              const displayPrice = item.price;
+              const displayPriceSub = item.duration_in_months === 12 ? '/year' : '/month';
+              const displayDuration = item.duration_in_months === 12 ? '12 Month Plan' : `${item.duration_in_months} Month Plan`;
 
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.packageCard}
-                activeOpacity={0.85}
-              >
-                <View style={styles.packageHeader}>
-                  <View style={styles.packageHeaderLeft}>
-                    <View style={[styles.tierIconContainer, { backgroundColor: theme.bgColor }]}>
-                      <Icon size={RFValue(16)} color={theme.primaryColor} />
-                    </View>
-                    <View style={styles.packageTitleContainer}>
-                      <Text style={styles.packageName}>{item.package_name}</Text>
-                      <Text style={styles.packageAudience}>{item.duration_in_months} Month{item.duration_in_months > 1 ? 's' : ''} Plan</Text>
-                    </View>
-                  </View>
-                  {/* {isSelected && (
-                    <View style={styles.selectedBadge}>
-                      <Text style={styles.selectedText}>Selected</Text>
-                    </View>
-                  )} */}
-                </View>
-
-                <Text style={[styles.packagePrice, { color: theme.primaryColor }]}>₹{item.price}</Text>
-
-                <View style={styles.limitGrid}>
-                  <View style={styles.limitCol}>
-                    <Briefcase size={RFValue(12)} color={theme.primaryColor} />
-                    <Text style={styles.limitValue}>{item.no_of_job_post || 0}</Text>
-                    <Text style={styles.limitLabel}>Jobs</Text>
-                  </View>
-                  <View style={styles.limitColDivider} />
-                  <View style={styles.limitCol}>
-                    <Building2 size={RFValue(12)} color={theme.primaryColor} />
-                    <Text style={styles.limitValue}>{item.no_of_location || 0}</Text>
-                    <Text style={styles.limitLabel}>Locations</Text>
-                  </View>
-                  <View style={styles.limitColDivider} />
-                  <View style={styles.limitCol}>
-                    <Users size={RFValue(12)} color={theme.primaryColor} />
-                    <Text style={styles.limitValue}>{item.no_of_users || 0}</Text>
-                    <Text style={styles.limitLabel}>Users</Text>
-                  </View>
-                  <View style={styles.limitColDivider} />
-                  <View style={styles.limitCol}>
-                    <CreditCard size={RFValue(12)} color={theme.primaryColor} />
-                    <Text style={styles.limitValue}>{item.no_of_profile || 0}</Text>
-                    <Text style={styles.limitLabel}>Profiles</Text>
-                  </View>
-                </View>
-
-                {item.package_desc ? (
-                  <View style={styles.assignedFooter}>
-                    <Text style={[styles.assignedLabel, { fontSize: RFValue(8), color: Colors.textSecondary, lineHeight: RFValue(11) }]} numberOfLines={3}>
-                      {item.package_desc}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <TouchableOpacity
-                  style={[styles.purchaseBtn, { backgroundColor: Colors.primary }]}
-                  onPress={() => handlePurchase(item)}
-                  activeOpacity={0.8}
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.planCard,
+                    isMostPopular && styles.planCardHighlighted
+                  ]}
                 >
-                  <Text style={styles.purchaseBtnText}>Purchase Now</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          })
-        )}
-        {/* 
-        <Text style={styles.sectionTitle}>Company Verification</Text>
-        <View style={styles.verificationCard}>
-          {managedCompanies.map(company => (
-            <View key={company.id} style={styles.companyRow}>
-              <View style={styles.companyLeft}>
-                <View style={styles.companyIcon}>
-                  <ShieldCheck size={RFValue(10)} color={company.verification === 'Active Company' ? Colors.success : Colors.warning} />
-                </View>
-                <View>
-                  <Text style={styles.companyName}>{company.name}</Text>
-                  <Text style={styles.companyMeta}>{company.role}</Text>
-                </View>
-              </View>
-              <Text style={[styles.companyStatus, company.verification === 'Active Company' ? styles.companyStatusActive : styles.companyStatusPending]}>
-                {company.verification}
-              </Text>
-            </View>
-          ))}
-        </View> */}
+                  {isMostPopular && (
+                    <View style={styles.ribbonBadge}>
+                      <Text style={styles.ribbonText}>MOST POPULAR</Text>
+                    </View>
+                  )}
 
-        {/* <Text style={styles.sectionTitle}>Revenue Model</Text>
-        <View style={styles.revenueCard}>
-          {revenueStreams.map(stream => (
-            <View key={stream.id} style={styles.revenueRow}>
-              <View>
-                <Text style={styles.revenueTitle}>{stream.title}</Text>
-                <Text style={styles.revenueSub}>{stream.subtitle}</Text>
-              </View>
-              <Text style={styles.revenueValue}>{stream.value}</Text>
-            </View>
-          ))}
-        </View> */}
+                  <View style={styles.planCardHeader}>
+                    <View style={styles.planCardHeaderLeft}>
+                      <View style={[styles.planIconContainer, { backgroundColor: theme.bgColor }]}>
+                        <Icon size={RFValue(16)} color={theme.primaryColor} />
+                      </View>
+                      <View style={styles.planTitleContainer}>
+                        <Text style={styles.planName}>{item.package_name}</Text>
+                        <Text style={styles.planDuration}>{displayDuration}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.planCardHeaderRight}>
+                      <View style={styles.planPriceContainer}>
+                        <Text style={styles.planPrice}>₹{displayPrice}</Text>
+                        <Text style={styles.planPriceSub}>{displayPriceSub}</Text>
+                      </View>
+                      <ChevronRight size={RFValue(12)} color={Colors.textTertiary} />
+                    </View>
+                  </View>
+
+                  <View style={styles.planFeaturesGrid}>
+                    {/* Job Posts */}
+                    <View style={styles.planFeatureCol}>
+                      <Briefcase size={RFValue(12)} color={theme.primaryColor} />
+                      <Text style={styles.planFeatureValue}>{formatLimitValue(item.no_of_job_post, item.package_name)}</Text>
+                      <Text style={styles.planFeatureLabel}>Job Posts</Text>
+                    </View>
+                    <View style={styles.planFeatureDivider} />
+
+                    {/* Locations */}
+                    <View style={styles.planFeatureCol}>
+                      <MapPin size={RFValue(12)} color={theme.primaryColor} />
+                      <Text style={styles.planFeatureValue}>{formatLimitValue(item.no_of_location, item.package_name)}</Text>
+                      <Text style={styles.planFeatureLabel}>Locations</Text>
+                    </View>
+                    <View style={styles.planFeatureDivider} />
+
+                    {/* Users */}
+                    <View style={styles.planFeatureCol}>
+                      <Users size={RFValue(12)} color={theme.primaryColor} />
+                      <Text style={styles.planFeatureValue}>{formatLimitValue(item.no_of_users, item.package_name)}</Text>
+                      <Text style={styles.planFeatureLabel}>Users</Text>
+                    </View>
+                    <View style={styles.planFeatureDivider} />
+
+                    {/* Profiles */}
+                    <View style={styles.planFeatureCol}>
+                      <FileText size={RFValue(12)} color={theme.primaryColor} />
+                      <Text style={styles.planFeatureValue}>{formatLimitValue(item.no_of_profile, item.package_name)}</Text>
+                      <Text style={styles.planFeatureLabel}>Profiles</Text>
+                    </View>
+                  </View>
+
+                  {isActivePlan ? (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: Colors.primary }]}
+                      onPress={() => handlePurchase(item)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.actionBtnText}>Manage Plan</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionBtnOutlined,
+                        { borderColor: theme.primaryColor }
+                      ]}
+                      onPress={() => {
+                        const purchaseItem = {
+                          ...item,
+                          price: displayPrice,
+                          duration_in_months: item.duration_in_months
+                        };
+                        handlePurchase(purchaseItem);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.actionBtnOutlinedText, { color: theme.primaryColor }]}>
+                        {currentPlan && currentPlan.status === 'active' ? 'Upgrade Now' : 'Purchase Now'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })
+        )}
+
+
+        {/* Footer Security */}
+        <View style={styles.securityFooter}>
+          <Lock size={RFValue(10)} color={Colors.textSecondary} />
+          <Text style={styles.securityFooterText}>All payments are secure and encrypted</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -229,180 +457,379 @@ const PackageManagementScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { paddingHorizontal: wp('2%'), paddingBottom: hp('4%') },
-  creditCard: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: wp('3%'),
-    padding: wp('4%'),
+  content: { paddingHorizontal: wp('3%'), paddingBottom: hp('4%') },
+
+  // Gradient Current Plan Card
+  currentPlanCard: {
+    borderRadius: wp('4%'),
+    padding: wp('3%'),
+    marginTop: hp('1.5%'),
+    marginBottom: hp('1.5%'),
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  currentPlanHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
     marginBottom: hp('1.5%'),
   },
-  creditHeader: {
+  currentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    paddingHorizontal: wp('2%'),
+    paddingVertical: hp('0.4%'),
+    borderRadius: wp('3%'),
+    gap: wp('1%'),
+  },
+  currentBadgeText: {
+    fontSize: RFValue(7),
+    color: Colors.primary,
+    fontWeight: '800',
+  },
+  currentPlanMain: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: hp('1%'),
   },
-  creditTitleRow: { flexDirection: 'row', alignItems: 'center', gap: wp('2%') },
-  creditTitle: { fontSize: RFValue(10.5), color: Colors.textPrimary, fontWeight: '800' },
-  creditPill: {
-    fontSize: RFValue(8),
-    color: Colors.primary,
-    fontWeight: '800',
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: wp('2%'),
-    paddingVertical: hp('0.4%'),
-    borderRadius: wp('2%'),
-  },
-  creditProgressTrack: {
-    height: hp('0.8%'),
-    backgroundColor: Colors.borderLight,
-    borderRadius: wp('2%'),
-    overflow: 'hidden',
-    marginBottom: hp('0.8%'),
-  },
-  creditProgressFill: { height: '100%', backgroundColor: Colors.primary },
-  creditSub: { fontSize: RFValue(8), color: Colors.textSecondary, fontWeight: '600' },
-  sectionTitle: {
-    fontSize: RFValue(10.5),
-    color: Colors.textPrimary,
-    fontWeight: '800',
-    marginTop: hp('1%'),
-    marginBottom: hp('1%'),
-  },
-  packageCard: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.borderLight || '#ECECEC',
-    borderRadius: wp('4.5%'),
-    padding: wp('5%'),
-    marginBottom: hp('2%'),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  packageCardActive: {
-    borderColor: Colors.borderLight || '#ECECEC',
-    borderWidth: 1,
-  },
-  packageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  packageHeaderLeft: {
+  currentPlanLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp('3%'),
   },
-  tierIconContainer: {
-    width: wp('12%'),
-    height: wp('12%'),
-    borderRadius: wp('3%'),
+  currentPlanIconContainer: {
+    width: wp('10.5%'),
+    height: wp('10.5%'),
+    borderRadius: wp('5.25%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  packageTitleContainer: {
+  currentPlanDetails: {
     justifyContent: 'center',
   },
-  packageName: { fontSize: RFValue(12), color: Colors.textPrimary, fontWeight: '700' },
-  packageAudience: { fontSize: RFValue(9), color: Colors.textSecondary, fontWeight: '500', marginTop: hp('0.2%') },
-  selectedBadge: {
-    backgroundColor: Colors.success,
-    paddingHorizontal: wp('3.5%'),
-    paddingVertical: hp('0.6%'),
-    borderRadius: wp('5%'),
+  currentPlanName: {
+    fontSize: RFValue(11.5),
+    color: Colors.white,
+    fontWeight: '700',
   },
-  selectedText: { fontSize: RFValue(8), color: Colors.white, fontWeight: '700' },
-  packagePrice: { fontSize: RFValue(11.5), fontWeight: '700', marginTop: hp('1.5%'), marginBottom: hp('1.5%') },
-  limitGrid: {
+  currentPlanDuration: {
+    fontSize: RFValue(7.5),
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: hp('0.1%'),
+  },
+  currentPlanRenewalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp('1%'),
+    marginTop: hp('0.4%'),
+  },
+  currentPlanRenewalText: {
+    fontSize: RFValue(7.5),
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontWeight: '600',
+  },
+  currentPlanRight: {
+    alignItems: 'flex-end',
+  },
+  currentPlanPrice: {
+    fontSize: RFValue(15),
+    color: Colors.white,
+    fontWeight: '700',
+  },
+  currentPlanPriceSub: {
+    fontSize: RFValue(8.5),
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+  },
+  currentPlanGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    paddingTop: hp('1.5%'),
+  },
+  currentPlanGridCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  currentPlanGridIconCircle: {
+    width: wp('5.5%'),
+    height: wp('5.5%'),
+    borderRadius: wp('2.75%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp('0.4%'),
+  },
+  currentPlanGridValue: {
+    fontSize: RFValue(8.5),
+    color: Colors.white,
+    fontWeight: '800',
+  },
+  currentPlanGridLabel: {
+    fontSize: RFValue(7.5),
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  currentProgressTrack: {
+    height: hp('0.4%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: wp('1%'),
+    overflow: 'hidden',
+    marginTop: hp('0.5%'),
+    width: wp('12%'),
+  },
+  currentProgressFill: {
+    height: '100%',
+    backgroundColor: Colors.white,
+    borderRadius: wp('1%'),
+  },
+
+  // Trust Bar
+  trustBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    paddingVertical: hp('1%'),
+    paddingHorizontal: wp('4%'),
+    borderRadius: wp('3%'),
+    marginBottom: hp('1.5%'),
+    borderWidth: 1,
+    borderColor: '#ECEEF2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  trustItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp('1.5%'),
+  },
+  trustText: {
+    fontSize: RFValue(8),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  trustDivider: {
+    width: 1,
+    height: hp('2%'),
+    backgroundColor: '#ECEEF2',
+  },
+
+  // Available plans header / filter
+  planFilterSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: hp('1.5%'),
+    marginBottom: hp('1.5%'),
+  },
+  availableTitle: {
+    fontSize: RFValue(12.5),
+    color: Colors.textPrimary,
+    fontWeight: '800',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterTabContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    padding: wp('0.8%'),
+    borderRadius: wp('4%'),
+    borderWidth: 1,
+    borderColor: '#ECEEF2',
+  },
+  filterTab: {
+    paddingHorizontal: wp('3.5%'),
+    paddingVertical: hp('0.5%'),
+    borderRadius: wp('3%'),
+  },
+  filterTabActive: {
+    backgroundColor: Colors.primary,
+  },
+  filterTabText: {
+    fontSize: RFValue(8.8),
+    color: Colors.textSecondary,
+    fontWeight: '700',
+  },
+  filterTabTextActive: {
+    color: Colors.white,
+  },
+  savePill: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: wp('2%'),
+    paddingVertical: hp('0.4%'),
+    borderRadius: wp('2%'),
+    marginLeft: wp('1.5%'),
+  },
+  savePillText: {
+    fontSize: RFValue(7.5),
+    color: '#10B981',
+    fontWeight: '800',
+  },
+
+  // Plan Cards
+  planCard: {
+    backgroundColor: Colors.white,
+    borderRadius: wp('4%'),
+    padding: wp('4.5%'),
+    marginBottom: hp('2.5%'),
+    borderWidth: 1,
+    borderColor: '#ECEEF2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 5,
+    elevation: 2,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  planCardHighlighted: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+  },
+  ribbonBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: wp('3.5%'),
+    paddingVertical: hp('0.4%'),
+    borderBottomRightRadius: wp('3%'),
+  },
+  ribbonText: {
+    fontSize: RFValue(7.5),
+    color: Colors.white,
+    fontWeight: '800',
+  },
+  planCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: hp('0.8%'),
+  },
+  planCardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp('3%'),
+  },
+  planIconContainer: {
+    width: wp('9%'),
+    height: wp('9%'),
+    borderRadius: wp('2%'),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  planTitleContainer: {
+    justifyContent: 'center',
+  },
+  planName: {
+    fontSize: RFValue(10.5),
+    color: Colors.textPrimary,
+    fontWeight: '800',
+  },
+  planDuration: {
+    fontSize: RFValue(7.5),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginTop: hp('0.1%'),
+  },
+  planCardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp('2%'),
+  },
+  planPriceContainer: {
+    alignItems: 'flex-end',
+  },
+  planPrice: {
+    fontSize: RFValue(13),
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  planPriceSub: {
+    fontSize: RFValue(7.5),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  planFeaturesGrid: {
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#F3F4F6',
-    paddingVertical: hp('1.5%'),
-    marginTop: hp('1%'),
+    paddingVertical: hp('1.2%'),
+    marginTop: hp('1.8%'),
+    marginBottom: hp('1.8%'),
   },
-  limitCol: {
+  planFeatureCol: {
     flex: 1,
     alignItems: 'center',
-    gap: hp('0.5%'),
+    gap: hp('0.3%'),
   },
-  limitColDivider: {
+  planFeatureDivider: {
     width: 1,
-    height: hp('4.5%'),
+    height: hp('3.5%'),
     backgroundColor: '#E5E7EB',
   },
-  limitValue: { fontSize: RFValue(11.5), color: Colors.textPrimary, fontWeight: '700' },
-  limitLabel: { fontSize: RFValue(8), color: Colors.textSecondary, fontWeight: '500' },
-  assignedFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: hp('1.5%'),
+  planFeatureValue: {
+    fontSize: RFValue(10.5),
+    color: Colors.textPrimary,
+    fontWeight: '800',
   },
-  assignedLabel: { fontSize: RFValue(7.5), color: Colors.textSecondary, fontWeight: '500' },
-  assignedValue: { fontSize: RFValue(9), color: Colors.textPrimary, fontWeight: '600' },
-  purchaseBtn: {
-    borderRadius: 8,
-    paddingVertical: hp('1%'),
+  planFeatureLabel: {
+    fontSize: RFValue(8),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  actionBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: wp('2.5%'),
+    paddingVertical: hp('1.2%'),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp('1.5%'),
   },
-  purchaseBtnText: {
+  actionBtnText: {
     color: Colors.white,
     fontSize: RFValue(9.5),
     fontWeight: '800',
   },
-
-  verificationCard: {
+  actionBtnOutlined: {
     backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: wp('3%'),
-    padding: wp('3%'),
-  },
-  companyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: hp('1%'),
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  companyLeft: { flexDirection: 'row', alignItems: 'center', gap: wp('2%'), flex: 1 },
-  companyIcon: {
-    width: wp('8%'),
-    height: wp('8%'),
-    borderRadius: wp('2%'),
-    backgroundColor: Colors.background,
+    borderRadius: wp('2.5%'),
+    paddingVertical: hp('1.2%'),
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  companyName: { fontSize: RFValue(8.8), color: Colors.textPrimary, fontWeight: '800' },
-  companyMeta: { fontSize: RFValue(7.5), color: Colors.textSecondary, fontWeight: '600' },
-  companyStatus: { fontSize: RFValue(7.5), fontWeight: '800' },
-  companyStatusActive: { color: Colors.success },
-  companyStatusPending: { color: Colors.warning },
-  revenueCard: {
-    backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: wp('3%'),
-    paddingHorizontal: wp('3%'),
-    marginBottom: hp('3%'),
   },
-  revenueRow: {
+  actionBtnOutlinedText: {
+    fontSize: RFValue(9.5),
+    fontWeight: '800',
+  },
+  // Security Footer
+  securityFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: hp('1.1%'),
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    justifyContent: 'center',
+    gap: wp('1%'),
   },
-  revenueTitle: { fontSize: RFValue(8.8), color: Colors.textPrimary, fontWeight: '800' },
-  revenueSub: { fontSize: RFValue(7.4), color: Colors.textSecondary, fontWeight: '600', marginTop: hp('0.2%') },
-  revenueValue: { fontSize: RFValue(8.8), color: Colors.primary, fontWeight: '800' },
+  securityFooterText: {
+    fontSize: RFValue(8.5),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
 });
 
 export default PackageManagementScreen;

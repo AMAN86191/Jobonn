@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Image } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -70,7 +71,33 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
       true,
     ));
 
-    const timer = setTimeout(() => navigation.replace('Onboarding'), 2800);
+    const checkSessionAndNavigate = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const userDataStr = await AsyncStorage.getItem('userData');
+
+        if (token && userDataStr) {
+          const userData = JSON.parse(userDataStr);
+          console.log('user', userData)
+          const role = userData?.role || userData?.candidate?.user?.role;
+          console.log('role', role);
+          if (role === 'candidate') {
+            navigation.replace('CandidateHome');
+          } else {
+            navigation.replace('ManagerHome');
+          }
+        } else {
+          navigation.replace('Onboarding');
+        }
+      } catch (error) {
+        console.warn('Error checking session in Splash:', error);
+        navigation.replace('Onboarding');
+      }
+    };
+
+    const timer = setTimeout(() => {
+      checkSessionAndNavigate();
+    }, 2800);
     return () => clearTimeout(timer);
   }, []);
 
@@ -110,7 +137,10 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
         <Animated.View style={[styles.glowRing, glowAnimStyle]} />
 
         <Animated.View style={[styles.logoBox, logoAnimStyle]}>
-          <Text style={styles.logoLetter}>J</Text>
+          <Image
+            source={require('../../../assets/images/logo/jpn on logo.png')}
+            style={styles.logoImage}
+          />
         </Animated.View>
 
         <Animated.Text style={[styles.logoText, textAnimStyle]}>
@@ -152,22 +182,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   logoBox: {
-    width: wp('22%'),
-    height: wp('22%'),
+    width: wp('20%'),
+    height: wp('20%'),
     borderRadius: wp('6%'),
-    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: hp('2.5%'),
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: hp('1.5%') },
-    shadowOpacity: 0.6,
-    shadowRadius: wp('8%'),
-    elevation: 20,
   },
-  logoLetter: {
-    ...Typography.h2,
-    color: Colors.white,
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: wp('6%'),
+    resizeMode: 'cover',
   },
   logoText: {
     fontSize: wp('9%'),

@@ -20,9 +20,12 @@ import OTPVerificationModal from '../../components/modals/OTPVerificationModal';
 import CreatePasswordModal from '../../components/modals/CreatePasswordModal';
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { SendOtpSlice, VerifyOtpSlice, SetPasswordSlice } from '../../redux/AuthSlice';
+import {
+  SendOtpSlice, VerifyOtpSlice, SetPasswordSlice,
+  SendOtpCandidateSlice, VerifyOtpCandidateSlice, SetPasswordCandidateSlice
+} from '../../redux/AuthSlice';
 import Toast from 'react-native-toast-message';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Signup'>;
@@ -52,9 +55,15 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       setUserEmail(finalData.email || '');
 
       const payload = { ...finalData };
-      console.log('payload Send Otp', payload)
-      const res = await dispatch(SendOtpSlice(payload) as any).unwrap();
-      console.log('res', res)
+      delete payload.role;
+      console.log('payload Send Otp', payload);
+
+      const res = await (role === 'company'
+        ? dispatch(SendOtpSlice(payload) as any)
+        : dispatch(SendOtpCandidateSlice(payload) as any)
+      ).unwrap();
+
+      console.log('res', res);
       if (res?.status) {
         Toast.show({
           type: 'success',
@@ -89,9 +98,14 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       const payload = {
         "phone": phone || tempFormData?.phone,
         "otp": otp
-      }
-      const resOtpVerify = await dispatch(VerifyOtpSlice(payload) as any).unwrap();
-      console.log('resOtpVerify', resOtpVerify)
+      };
+
+      const resOtpVerify = await (role === 'company'
+        ? dispatch(VerifyOtpSlice(payload) as any)
+        : dispatch(VerifyOtpCandidateSlice(payload) as any)
+      ).unwrap();
+
+      console.log('resOtpVerify', resOtpVerify);
       if (resOtpVerify?.status == false) {
         const errorMsg = resOtpVerify?.message || 'Invalid OTP';
         setOtpError(errorMsg);
@@ -103,9 +117,13 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
 
-      // Store company_id from successful verification
+      // Store company_id or candidate_id from successful verification
       if (resOtpVerify?.company_id) {
         setCompanyId(resOtpVerify.company_id);
+      } else if (resOtpVerify?.candidate_id) {
+        setCompanyId(resOtpVerify.candidate_id);
+      } else if (resOtpVerify?.id) {
+        setCompanyId(resOtpVerify.id);
       }
 
       Toast.show({
@@ -136,13 +154,23 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setRegisterLoading(true);
 
-      const payload = {
-        company_id: String(companyId || ""),
-        password: password,
-        password_confirmation: password,
-      };
+      const payload = role === 'company'
+        ? {
+          company_id: String(companyId || ""),
+          password: password,
+          password_confirmation: password,
+        }
+        : {
+          candidate_id: String(companyId || ""),
+          password: password,
+          password_confirmation: password,
+        };
 
-      const resSetPassword = await dispatch(SetPasswordSlice(payload) as any).unwrap();
+      const resSetPassword = await (role === 'company'
+        ? dispatch(SetPasswordSlice(payload) as any)
+        : dispatch(SetPasswordCandidateSlice(payload) as any)
+      ).unwrap();
+
       console.log('resSetPassword', resSetPassword);
 
       if (resSetPassword?.status === false) {
@@ -154,15 +182,53 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         return;
       }
 
+      if (resSetPassword?.token) {
+        await AsyncStorage.setItem('userToken', resSetPassword.token);
+      }
+      let userData: any = null;
+      if (role === 'company') {
+        const companyObj = resSetPassword.company || {};
+        const userObj = companyObj.user || resSetPassword.user || {};
+        userData = {
+          ...userObj,
+          company: companyObj,
+          role: 'company',
+          profile_completed: false,
+        };
+      } else if (role === 'candidate') {
+        const candObj = resSetPassword.candidate || {};
+        const userObj = candObj.user || resSetPassword.user || {};
+        userData = {
+          ...userObj,
+          candidate: candObj,
+          role: 'candidate',
+          profile_completed: false,
+        };
+      } else if (resSetPassword?.user) {
+        userData = {
+          ...resSetPassword.user,
+          profile_completed: false,
+        };
+      }
+
+      if (userData) {
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      }
+
       Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: resSetPassword?.message || 'Password set successfully!',
+        type: 'success', 
+        text1: 'Password Set Successful',
+        text2: resSetPassword?.message || 'Now fill the details to complete your profile.',
       });
 
       setShowPasswordModal(false);
       // Navigate to CompleteProfile instead of Home
-      navigation.replace('CompleteProfile', { ...resSetPassword, role: role, company_id: companyId || resSetPassword?.company_id } as any);
+      navigation.replace('CompleteProfile', {
+        ...resSetPassword,
+        role: role,
+        company_id: role === 'company' ? (companyId || resSetPassword?.company_id) : undefined,
+        candidate_id: role === 'candidate' ? (companyId || resSetPassword?.candidate_id) : undefined
+      } as any);
     } catch (error: any) {
       console.error('Registration failed:', error);
       Toast.show({

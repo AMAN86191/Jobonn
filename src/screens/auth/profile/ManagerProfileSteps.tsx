@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { useForm, Controller } from 'react-hook-form';
@@ -24,6 +24,7 @@ interface ManagerProfileStepsProps {
   onSkipStep: (stepIndex: number) => void;
   saving: boolean;
   totalSteps: number;
+  initialData?: any;
 }
 
 // Validation Schemas
@@ -60,6 +61,7 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
   onSkipStep,
   saving,
   totalSteps,
+  initialData,
 }) => {
   const [isAwardModalVisible, setIsAwardModalVisible] = useState(false);
   const [editingAwardIndex, setEditingAwardIndex] = useState<number | null>(null);
@@ -73,7 +75,7 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
     }
   };
 
-  const { control, handleSubmit, formState: { errors }, trigger } = useForm({
+  const { control, handleSubmit, formState: { errors }, trigger, reset } = useForm({
     resolver: yupResolver(getSchemaForStep(currentStep) as any),
     defaultValues: {
       companyName: '', website: '', companySize: '', industry: '', bio: '', location: '',
@@ -81,6 +83,33 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
       foundedDate: '', awards: [], fb_link: '', insta_link: '', linked_link: '',
     }
   });
+
+  useEffect(() => {
+    if (initialData) {
+      const company = initialData.company || initialData;
+      reset({
+        companyName: company.company_name || company.companyName || '',
+        website: company.company_web_url || company.website || '',
+        companySize: company.company_size || company.companySize || '',
+        industry: company.industry_type || company.industry || '',
+        bio: company.company_about || company.bio || '',
+        location: company.office_location || company.location || '',
+        companyLogo: company.company_logo ? { uri: company.company_logo } : null,
+        coverImage: company.cover_img ? { uri: company.cover_img } : null,
+        gstNumber: company.gst_no || company.gstNumber || '',
+        verifDoc: company.company_docs ? { uri: company.company_docs, name: 'document.pdf' } : null,
+        foundedDate: company.founded_date || company.foundedIn || '',
+        awards: (company.awards || []).map((a: any) => ({
+          title: a.award_title || a.title || '',
+          date: a.award_date || a.date || a.year || '',
+          description: a.desc || a.description || ''
+        })),
+        fb_link: company.fb_link || '',
+        insta_link: company.insta_link || '',
+        linked_link: company.linked_link || '',
+      } as any);
+    }
+  }, [initialData, reset]);
 
   const handleNext = async (data: any) => {
     const isValid = await trigger();

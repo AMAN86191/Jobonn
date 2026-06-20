@@ -33,10 +33,12 @@ import CandidateApplicationFullView from '../screens/manager/CandidateApplicatio
 import ManagerAllJobsScreen from '../screens/manager/ManagerAllJobsScreen';
 import ManagerInterviewsScreen from '../screens/manager/ManagerInterviewsScreen';
 import RecommendedCandidatesScreen from '../screens/manager/RecommendedCandidatesScreen';
-import ManagerEditProfileScreen from '../screens/manager/ManagerEditProfileScreen';
+
 import ManagerAnalyticsScreen from '../screens/manager/ManagerAnalyticsScreen';
 import PackageManagementScreen from '../screens/manager/PackageManagementScreen';
 import AuditLogScreen from '../screens/manager/AuditLogScreen';
+import UpdateCompanyProfileScreen from '../screens/auth/UpdateCompanyProfileScreen';
+import TermsAndConditionsScreen from '../screens/common/TermsAndConditionsScreen';
 
 // ─── Route Param List ───────────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -46,7 +48,7 @@ export type RootStackParamList = {
   RoleSelection: { fromSignup?: boolean };
   Login: { role?: 'candidate' | 'company' } | undefined;
   Signup: { role: 'candidate' | 'company' };
-  CompleteProfile: { role?: 'candidate' | 'company'; [key: string]: any } | undefined;
+  CompleteProfile: { role?: 'candidate' | 'company';[key: string]: any } | undefined;
   ForgotPassword: undefined;
   ResetPassword: undefined;
 
@@ -69,10 +71,11 @@ export type RootStackParamList = {
   ManagerAllJobs: undefined;
   ManagerInterviews: undefined;
   RecommendedCandidates: undefined;
-  ManagerEditProfile: undefined;
+  UpdateCompanyProfileScreen: { role?: 'candidate' | 'company'; company_id?: string | number; isEditMode?: boolean; profileData?: any;[key: string]: any } | undefined;
   ManagerAnalytics: undefined;
   PackageManagement: undefined;
   AuditLogs: undefined;
+  TermsAndConditions: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -145,17 +148,17 @@ const Allroute = () => {
         <Stack.Screen
           name="JobDetails"
           component={JobDetailsScreen}
-       
+
         />
         <Stack.Screen
           name="ApplyJobFlow"
           component={ApplyJobFlow}
-        
+
         />
         <Stack.Screen
           name="ApplicationSuccess"
           component={ApplicationSuccessScreen}
-       
+
         />
         <Stack.Screen
           name="CandidateNotifications"
@@ -204,8 +207,8 @@ const Allroute = () => {
           component={RecommendedCandidatesScreen}
         />
         <Stack.Screen
-          name="ManagerEditProfile"
-          component={ManagerEditProfileScreen}
+          name="UpdateCompanyProfileScreen"
+          component={UpdateCompanyProfileScreen}
         />
         <Stack.Screen
           name="ManagerAnalytics"
@@ -218,6 +221,10 @@ const Allroute = () => {
         <Stack.Screen
           name="AuditLogs"
           component={AuditLogScreen}
+        />
+        <Stack.Screen
+          name="TermsAndConditions"
+          component={TermsAndConditionsScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

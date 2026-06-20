@@ -19,6 +19,7 @@ import ActiveJobCard from '../../components/Manager_component/ActiveJobCard';
 import AdSlider from '../../components/Manager_component/AdSlider';
 import { RFValue } from 'react-native-responsive-fontsize';
 import { recruiterProfile, jobs, talentDatabase, managedCompanies, packages, contactCredits } from '../../data/jobonnStaticData';
+import ProfileCompletenessBanner from '../../components/Manager_component/ProfileCompletenessBanner';
 
 const STATS = [
   { id: '1', title: 'Active Jobs', value: `${recruiterProfile.stats.postedJobs}`, icon: Briefcase, color: Colors.primary, subtitle: '+2 this week' },
@@ -43,13 +44,20 @@ const activePackage = packages.find(item => item.active);
 const ManagerHomeScreen = ({ navigation }: any) => {
   const [user, setUser] = React.useState<any>(null);
 
+  const loadUser = async () => {
+    const data = await AsyncStorage.getItem('userData');
+    console.log('data', data);
+    if (data) setUser(JSON.parse(data));
+  };
+
   React.useEffect(() => {
-    const loadUser = async () => {
-      const data = await AsyncStorage.getItem('userData');
-      if (data) setUser(JSON.parse(data));
-    };
     loadUser();
-  }, []);
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUser();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -99,25 +107,8 @@ const ManagerHomeScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* Incomplete Profile Banner */}
-        {user && !user.profile_completed && (
-          <TouchableOpacity
-            style={styles.profileBanner}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('CompleteProfile', { role: 'company' })}
-          >
-            <View style={styles.profileBannerContent}>
-              <View style={styles.profileBannerIconBg}>
-                <AlertCircle size={RFValue(12)} color={Colors.warning} />
-              </View>
-              <View style={styles.profileBannerTextWrap}>
-                <Text style={styles.profileBannerTitle}>Complete Company Profile</Text>
-                <Text style={styles.profileBannerSub}>A verified company profile attracts more candidates.</Text>
-              </View>
-              <ChevronRight size={RFValue(12)} color={Colors.warning} />
-            </View>
-          </TouchableOpacity>
-        )}
+        {/* Profile Completeness Banner */}
+        <ProfileCompletenessBanner user={user} navigation={navigation} />
 
         {/* Stats */}
         <View style={styles.statsRow}>
@@ -305,41 +296,7 @@ const styles = StyleSheet.create({
     marginTop: hp('0.2%'),
   },
 
-  // Profile Banner
-  profileBanner: {
-    backgroundColor: Colors.warningLight,
-    borderWidth: 1,
-    borderColor: Colors.warning + '40',
-    borderRadius: wp('3%'),
-    marginBottom: hp('2%'),
-    marginTop: hp('1%'),
-    overflow: 'hidden',
-  },
-  profileBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: wp('3%'),
-  },
-  profileBannerIconBg: {
-    backgroundColor: Colors.white,
-    padding: wp('1.5%'),
-    borderRadius: wp('2%'),
-    marginRight: wp('3%'),
-  },
-  profileBannerTextWrap: {
-    flex: 1,
-  },
-  profileBannerTitle: {
-    fontSize: RFValue(10),
-    fontWeight: '700',
-    color: Colors.warning,
-    marginBottom: hp('0.3%'),
-  },
-  profileBannerSub: {
-    fontSize: RFValue(8.5),
-    color: Colors.warning,
-    fontWeight: '500',
-  },
+
 
   promoBanner: {
     marginBottom: hp('8%'),

@@ -12,7 +12,7 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const signupSchema = yup.object().shape({
-  name: yup.string().required('Full name is required'),
+  full_name: yup.string().required('Full name is required'),
   email: yup.string().email('Invalid email').required('Email is required'),
   phone: yup.string().min(10, 'Invalid phone number').required('Phone is required'),
 });
@@ -26,7 +26,7 @@ const CandidateSignupFlow: React.FC<CandidateSignupFlowProps> = ({ onComplete, l
   const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(signupSchema),
     defaultValues: {
-      name: '',
+      full_name: '',
       email: '',
       phone: '',
     }
@@ -35,7 +35,7 @@ const CandidateSignupFlow: React.FC<CandidateSignupFlowProps> = ({ onComplete, l
   const onSubmit = (data: any) => {
     onComplete({
       role: 'candidate',
-      name: data.name,
+      full_name: data.full_name,
       email: data.email,
       phone: data.phone,
     });
@@ -53,13 +53,13 @@ const CandidateSignupFlow: React.FC<CandidateSignupFlowProps> = ({ onComplete, l
 
       {/* Form */}
       <Animated.View entering={FadeInDown.duration(400).delay(250)} style={styles.formSection}>
-        <Controller control={control} name="name" render={({ field: { onChange, value } }) => (
+        <Controller control={control} name="full_name" render={({ field: { onChange, value } }) => (
           <CustomInput
             label="Full Name"
             placeholder="Enter your full name"
             value={value}
             onChangeText={onChange}
-            error={errors.name?.message as string}
+            error={errors.full_name?.message as string}
           />
         )} />
         <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
@@ -81,6 +81,7 @@ const CandidateSignupFlow: React.FC<CandidateSignupFlowProps> = ({ onComplete, l
             value={value}
             onChangeText={onChange}
             error={errors.phone?.message as string}
+            maxLength={10}
           />
         )} />
       </Animated.View>
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   headerSection: {
     marginBottom: hp('3%'),
   },
- 
+
   title: {
     ...Typography.h3,
     color: Colors.textPrimary,

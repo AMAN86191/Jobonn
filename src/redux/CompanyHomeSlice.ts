@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getCompanyPackages } from '../api/CompanyHomeProvider';
+import { getCompanyPackages, packagePurchase, getCompanyProfile } from '../api/CompanyHomeProvider';
 
 interface CompanyHomeState {
   packages: any[];
@@ -18,6 +18,28 @@ export const getCompanyPackagesSlice = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await getCompanyPackages();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+export const packagePurchaseSlice = createAsyncThunk(
+  'companyHome/packagePurchaseSlice',
+  async (payload: any, { rejectWithValue }) => {
+    try {
+      const response = await packagePurchase(payload);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+export const getCompanyProfileSlice = createAsyncThunk(
+  'companyHome/getCompanyProfileSlice',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getCompanyProfile();
       return response;
     } catch (error) {
       return rejectWithValue(error);
