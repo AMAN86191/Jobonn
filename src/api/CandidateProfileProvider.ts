@@ -66,7 +66,10 @@ export const getProfile = async () => {
 
 export const updateProfile = async (payload: any) => {
   try {
-    const response = await api.post('/candidate/profile-update', payload);
+    const isFormData = payload instanceof FormData;
+    const response = await api.post('/candidate/profile-update', payload, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return response.data;
   } catch (error: any) {
     const data = error.response?.data ?? { message: error.message };

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, StatusBar, Pressable, Image, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { ChevronLeft,  MapPin, Briefcase,  IndianRupee, Send,  Clock, Building } from 'lucide-react-native';
@@ -12,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { RFValue } from 'react-native-responsive-fontsize';
 import { JobDetailsTabContent, AboutCompanyTabContent, BenefitsTabContent, SimilarJobsTabContent } from '../../components/Candidate_component/JobTabComponents';
 import { jobs } from '../../data/jobonnStaticData';
+import { logJobView, logCompanyProfileView } from '../../services/firebase/analytics';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -28,6 +29,12 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
   const applyAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: applyScale.value }],
   }));
+
+  useEffect(() => {
+    if (job) {
+      logJobView(job.id, job.title);
+    }
+  }, [job]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (isProgrammaticScroll.current) return;
@@ -47,11 +54,17 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
     }
     if (currentTab !== activeTab) {
       setActiveTab(currentTab);
+      if (currentTab === 'About Company' && job) {
+        logCompanyProfileView(job.companyId || job.company_id || 'static_company_id', job.company);
+      }
     }
   };
 
   const onTabPress = (item: string) => {
     setActiveTab(item);
+    if (item === 'About Company' && job) {
+      logCompanyProfileView(job.companyId || job.company_id || 'static_company_id', job.company);
+    }
     const tabY = sectionLayouts.current[item] || 0;
 
     // Set flag to ignore scroll events while animating

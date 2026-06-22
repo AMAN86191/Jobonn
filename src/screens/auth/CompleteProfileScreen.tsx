@@ -321,7 +321,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   onSkipStep={handleSkipStep}
                   saving={saving}
                   totalSteps={totalSteps}
-        
+
                 />
               )}
             </View>

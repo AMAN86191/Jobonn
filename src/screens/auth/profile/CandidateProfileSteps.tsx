@@ -123,19 +123,19 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
       maritalStatus: personal.marital_status || prev.maritalStatus,
       languages: (cand.languages && cand.languages.length > 0)
         ? cand.languages.map((l: any) => {
-            if (typeof l === 'string') {
-              return {
-                language: l,
-                proficiency: '',
-                comfortableIn: [],
-              };
-            }
+          if (typeof l === 'string') {
             return {
-              language: l.language_name || l.language || l.name || '',
-              proficiency: l.proficiency || '',
-              comfortableIn: parseComfortableIn(l.comfortable_in),
+              language: l,
+              proficiency: '',
+              comfortableIn: [],
             };
-          })
+          }
+          return {
+            language: l.language_name || l.language || l.name || '',
+            proficiency: l.proficiency || '',
+            comfortableIn: parseComfortableIn(l.comfortable_in),
+          };
+        })
         : prev.languages,
       city: personal.city || prev.city,
       state: personal.state || prev.state,
@@ -359,14 +359,14 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
         const data = new FormData();
         data.append('candidate_id', String(candidateId || ''));
         data.append('portfolio_link', formData.portfolio || '');
-        if (formData.profileImage) {
+        if (formData.profileImage && formData.profileImage.uri && (formData.profileImage.uri.startsWith('file:') || formData.profileImage.uri.startsWith('content:') || formData.profileImage.uri.startsWith('ph:'))) {
           data.append('profile_img', {
             uri: formData.profileImage.uri,
             name: formData.profileImage.name || 'profile.jpg',
             type: formData.profileImage.type || 'image/jpeg',
           } as any);
         }
-        if (formData.resume) {
+        if (formData.resume && formData.resume.uri && (formData.resume.uri.startsWith('file:') || formData.resume.uri.startsWith('content:') || formData.resume.uri.startsWith('ph:'))) {
           data.append('resume', {
             uri: formData.resume.uri,
             name: formData.resume.name || 'resume.pdf',

@@ -11,13 +11,15 @@ import UploadCard, { FileData } from '../../components/forms/UploadCard';
 import Pdf from 'react-native-pdf';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { RFValue } from 'react-native-responsive-fontsize';
+import { logJobApply } from '../../services/firebase/analytics';
 
 const TOTAL_STEPS = 3;
 
-const ApplyJobFlow = ({ navigation }: any) => {
+const ApplyJobFlow = ({ navigation, route }: any) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const isset = useSafeAreaInsets()
+  const job = route?.params?.job;
 
   // Form State
   const [resumeFile, setResumeFile] = useState<FileData | null>({
@@ -56,6 +58,9 @@ const ApplyJobFlow = ({ navigation }: any) => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      if (job) {
+        logJobApply(job.id, job.title);
+      }
       navigation.replace('ApplicationSuccess');
     }, 1500);
   };

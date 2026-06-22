@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { navigationRef } from '../utils/NavigationService';
 import { Colors } from '../theme/Colors';
+import { logScreen } from '../services/firebase/analytics';
 
 // Auth Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -82,8 +83,24 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // ─── Main Navigator ──────────────────────────────────────────────────────────
 const Allroute = () => {
+  const routeNameRef = React.useRef<string | undefined>(undefined);
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        routeNameRef.current = navigationRef.current?.getCurrentRoute()?.name;
+      }}
+      onStateChange={async () => {
+        const previousRouteName = routeNameRef.current;
+        const currentRouteName = navigationRef.current?.getCurrentRoute()?.name;
+
+        if (previousRouteName !== currentRouteName && currentRouteName) {
+          logScreen(currentRouteName);
+        }
+        routeNameRef.current = currentRouteName;
+      }}
+    >
       <Stack.Navigator
         initialRouteName="SplashScreen"
         screenOptions={{

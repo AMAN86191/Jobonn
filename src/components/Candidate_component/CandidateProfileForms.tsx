@@ -4,7 +4,6 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import { RFValue } from 'react-native-responsive-fontsize';
 import { Colors } from '../../theme/Colors';
 import { Plus } from 'lucide-react-native';
-
 import CustomInput from '../inputs/CustomInput';
 import DropdownInput from '../forms/DropdownInput';
 import DatePickerInput from '../forms/DatePickerInput';
@@ -17,7 +16,7 @@ export const ProfileInfoForm = ({ editData, setEditData }: any) => (
   <>
     <CustomInput label="Full Name" value={editData.name} onChangeText={(text: string) => setEditData({ ...editData, name: text })} placeholder="Enter name" />
     <CustomInput label="Job Title" value={editData.job_title} onChangeText={(text: string) => setEditData({ ...editData, job_title: text })} placeholder="Enter job title" />
-    <CustomInput label="Location" value={editData.current_location} onChangeText={(text: string) => setEditData({ ...editData, current_location: text })} placeholder="Enter location" />
+    {/* <CustomInput label="Location" value={editData.current_location} onChangeText={(text: string) => setEditData({ ...editData, current_location: text })} placeholder="Enter location" /> */}
     <CustomInput label="Email" value={editData.email} onChangeText={(text: string) => setEditData({ ...editData, email: text })} placeholder="Enter email" keyboardType="email-address" autoCapitalize="none" />
     <CustomInput label="Phone" value={editData.phone} onChangeText={(text: string) => setEditData({ ...editData, phone: text })} placeholder="Enter phone" keyboardType="phone-pad" />
   </>
@@ -64,13 +63,13 @@ export const ExperienceForm = ({ editData, updateExperience, addExperience, remo
   const parseDateString = (dateStr: any): Date | null => {
     if (!dateStr) return null;
     if (dateStr instanceof Date) return dateStr;
-    
+
     try {
       const parsed = Date.parse(dateStr);
       if (!isNaN(parsed)) {
         return new Date(parsed);
       }
-    } catch {}
+    } catch { }
 
     const parts = String(dateStr).split('-');
     if (parts.length === 3) {
@@ -90,7 +89,7 @@ export const ExperienceForm = ({ editData, updateExperience, addExperience, remo
 
     const d = new Date(dateStr);
     if (!isNaN(d.getTime())) return d;
-    
+
     return null;
   };
 
@@ -111,7 +110,7 @@ export const ExperienceForm = ({ editData, updateExperience, addExperience, remo
           <Text style={{ color: Colors.white, fontSize: RFValue(9), marginLeft: wp('1%'), fontWeight: '600' }}>Add</Text>
         </TouchableOpacity>
       </View>
-      {(editData.work_experience || []).map((exp: any, index: number) => (
+      {(editData.experiences || []).map((exp: any, index: number) => (
         <View key={index} style={{ backgroundColor: '#F9FAFB', padding: wp('3%'), borderRadius: 12, marginBottom: hp('1.5%'), borderWidth: 1, borderColor: '#E5E7EB' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: hp('1%') }}>
             <Text style={{ fontSize: RFValue(9.5), fontWeight: '700', color: Colors.textSecondary }}>Experience #{index + 1}</Text>
@@ -136,7 +135,7 @@ export const ExperienceForm = ({ editData, updateExperience, addExperience, remo
                   <CustomInput
                     label="End Date"
                     value="Present"
-                    onChangeText={() => {}}
+                    onChangeText={() => { }}
                     placeholder="Present"
                     editable={false}
                   />
@@ -334,11 +333,11 @@ export const LanguagesForm = ({ editData, setEditData, removeLanguage }: any) =>
             : (typeof editData.languages[editingLangIndex].comfortable_in === 'string'
               ? editData.languages[editingLangIndex].comfortable_in.split(', ')
               : [])).map((s: string) => {
-                  const st = s.trim();
-                  if (st === 'Read') return 'Reading';
-                  if (st === 'Write') return 'Writing';
-                  if (st === 'Speak') return 'Speaking';
-                  return st;
+                const st = s.trim();
+                if (st === 'Read') return 'Reading';
+                if (st === 'Write') return 'Writing';
+                if (st === 'Speak') return 'Speaking';
+                return st;
               })
         } : null}
         onSave={(data: any) => {

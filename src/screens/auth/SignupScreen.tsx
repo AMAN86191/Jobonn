@@ -26,6 +26,8 @@ import {
 } from '../../redux/AuthSlice';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setUser, logSignUp } from '../../services/firebase/analytics';
+import { setCrashlyticsUser } from '../../services/firebase/crashlytics';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Signup'>;
@@ -213,6 +215,15 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
       if (userData) {
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        const userId = String(userData.id || '');
+        if (userId) {
+          setUser(userId, {
+            email: userData.email || '',
+            role: role,
+          });
+          setCrashlyticsUser(userId, userData.email || '', userData.name || '');
+        }
+        logSignUp('email');
       }
 
       Toast.show({

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   Image,
+  Linking,
 } from 'react-native';
 import {
   widthPercentageToDP as wp,
@@ -145,18 +146,44 @@ export const ProfileHeaderInfo = ({ user, profile, completenessValue, onEdit }: 
           <Text style={styles.locationText}>{user?.phone || 'Not Specified'}</Text>
         </View>
 
+        {profile?.portfolio ? (
+          <TouchableOpacity
+            style={styles.locationRow}
+            activeOpacity={0.7}
+            onPress={() => {
+              let url = profile.portfolio;
+              if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+              }
+              Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+            }}
+          >
+            <Globe size={RFValue(9)} color={Colors.primary} />
+            <Text style={[styles.locationText, { color: Colors.primary, textDecorationLine: 'underline' }]}>
+              {profile.portfolio}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* <View style={styles.openToWorkBadge}>
         <View style={styles.openToWorkDot} />
         <Text style={styles.openToWorkText}>Open to Work</Text>
       </View> */}
-        {/* <TouchableOpacity style={styles.editProfileBtn} onPress={onEdit}>
-        <Edit3 size={RFValue(10)} color={Colors.white} />
-        <Text style={styles.editProfileBtnText}>Edit Profile</Text>
-      </TouchableOpacity> */}
+
       </View>
 
       <View style={styles.progressContainer}>
-        <CircularProgress value={completenessValue} />
+        {completenessValue === 100 ? (
+          <View style={styles.completedBadgeWrap}>
+            <View style={styles.badgePulseContainer}>
+              <BadgeCheck size={RFValue(25)} color={Colors.success} fill={Colors.successLight} />
+            </View>
+            <Text style={styles.completedBadgeText}>Verified</Text>
+            <Text style={styles.completedSubText}>100% Done</Text>
+          </View>
+        ) : (
+          <CircularProgress value={completenessValue} />
+        )}
       </View>
     </View>
   );
@@ -270,7 +297,7 @@ export const ResumeCard = ({ profile, onEdit, user }: { profile: any; onEdit?: (
     : '';
 
   const pdfSource = { uri: resumeUrl, cache: true };
-  
+
   const getDisplayFilename = () => {
     if (!hasResume) return '';
     const displayName = user?.name ? user.name.trim().replace(/\s+/g, ' ') : 'user';
@@ -385,13 +412,13 @@ export const ExperienceCard = ({ profile, onEdit }: { profile: any; onEdit?: () 
       </TouchableOpacity>
     </View>
 
-    {(profile?.work_experience && profile.work_experience.length > 0) ? (
+    {(profile?.experiences && profile.experiences.length > 0) ? (
       <View>
-        {profile.work_experience.map((exp: any, index: number) => (
+        {profile.experiences.map((exp: any, index: number) => (
           <View key={index} style={styles.timelineItem}>
             <View style={styles.timelineDotWrap}>
               <View style={[styles.timelineDot, { backgroundColor: Colors.primary }]} />
-              {index < profile.work_experience.length - 1 && <View style={styles.timelineLine} />}
+              {index < profile.experiences.length - 1 && <View style={styles.timelineLine} />}
             </View>
             <View style={styles.timelineContent}>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -682,7 +709,31 @@ const styles = StyleSheet.create({
   openToWorkBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.successLight, alignSelf: 'flex-start', paddingHorizontal: wp('1.5%'), paddingVertical: hp('0.2%'), borderRadius: wp('1%') },
   openToWorkDot: { width: wp('1.2%'), height: wp('1.2%'), borderRadius: wp('0.6%'), backgroundColor: Colors.success, marginRight: wp('1%') },
   openToWorkText: { fontSize: RFValue(7.5), color: Colors.success, fontWeight: '600' },
-  progressContainer: { alignItems: 'center' },
+  progressContainer: { alignItems: 'center', justifyContent: 'center' },
+  completedBadgeWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: wp('1%'),
+  },
+  badgePulseContainer: {
+    backgroundColor: Colors.successLight,
+    padding: wp('1.5%'),
+    borderRadius: wp('6%'),
+    borderWidth: 1,
+    borderColor: Colors.success + '20',
+  },
+  completedBadgeText: {
+    fontSize: RFValue(8),
+    fontWeight: '800',
+    color: Colors.success,
+    marginTop: hp('0.5%'),
+    textAlign: 'center',
+  },
+  completedSubText: {
+    fontSize: RFValue(7.5),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
 
   editProfileBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: hp('1%'), borderRadius: wp('2.5%'), marginTop: hp('1%'), gap: wp('1.5%'), maxWidth: wp('40%') },
   editProfileBtnText: { fontSize: RFValue(10), fontWeight: '700', color: Colors.white },

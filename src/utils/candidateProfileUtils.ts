@@ -106,7 +106,7 @@ export const normalizeCandidateProfile = (user: any) => {
     skills: normalizedSkills,
     languages: normalizedLanguages,
     education: normalizedEducation,
-    work_experience: candObj.work_experience || [], // fallback to empty
+    experiences: candObj.experiences || [], // fallback to empty
     resume: docsObj.resume || candObj.resume || '',
     profile_image: docsObj.profile_img || candObj.profile_image || candObj.profileImage || '',
     portfolio: docsObj.portfolio_link || candObj.portfolio || '',
@@ -147,7 +147,7 @@ export const buildProfilePayload = (activeSection: string, editData: any, cand: 
   } else if (activeSection === 'skills') {
     payload = { ...payload, skills: editData.skills };
   } else if (activeSection === 'experience') {
-    payload = { ...payload, work_experience: editData.work_experience };
+    payload = { ...payload, experiences: editData.experiences };
   } else if (activeSection === 'summary') {
     payload = { ...payload, profile_summery: editData.profile_summery };
   } else if (activeSection === 'career') {

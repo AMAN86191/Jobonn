@@ -155,7 +155,7 @@ const CandidateProfileScreen = ({ navigation }: any) => {
       skills: skillsList.map((s: any) => typeof s === 'string' ? s : (s.skill || s.skill_name || '')),
 
       // Experience (array of objects)
-      work_experience: cand.work_experience ? [...cand.work_experience] : [],
+      experiences: cand.experiences ? [...cand.experiences] : [],
 
       // Education (single education keys for API matching completeprofile)
       highest_qualification: firstEdu.highest_qualification || cand.highest_qualification || '',
@@ -164,7 +164,7 @@ const CandidateProfileScreen = ({ navigation }: any) => {
       percentage_cgpa: firstEdu.percentage_cgpa || cand.percentage_cgpa || '',
 
       // Personal Details
-      dob: personal.dob ? parseDOB (personal.dob) : null,
+      dob: personal.dob ? parseDOB(personal.dob) : null,
       gender: personal.gender || '',
       marital_status: personal.marital_status || '',
       city: personal.city || '',
@@ -239,22 +239,22 @@ const CandidateProfileScreen = ({ navigation }: any) => {
 
 
   const updateExperience = (index: number, key: string, value: string) => {
-    const updatedExp = [...editData.work_experience];
+    const updatedExp = [...editData.experiences];
     updatedExp[index] = { ...updatedExp[index], [key]: value };
-    setEditData({ ...editData, work_experience: updatedExp });
+    setEditData({ ...editData, experiences: updatedExp });
   };
 
   const addExperience = () => {
     setEditData({
       ...editData,
-      work_experience: [...(editData.work_experience || []), { company: '', position: '', startDate: '', endDate: '' }]
+      experiences: [...(editData.experiences || []), { company: '', position: '', startDate: '', endDate: '' }]
     });
   };
 
   const removeExperience = (index: number) => {
     setEditData({
       ...editData,
-      work_experience: editData.work_experience.filter((_: any, i: number) => i !== index)
+      experiences: editData.experiences.filter((_: any, i: number) => i !== index)
     });
   };
 

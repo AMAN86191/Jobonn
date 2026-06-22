@@ -32,6 +32,8 @@ import { LoginSlice } from '../../redux/AuthSlice';
 import Toast from 'react-native-toast-message';
 import { candidateProfile, recruiterProfile } from '../../data/jobonnStaticData';
 import { getProfileCompleteness } from '../../utils/profileCompleteness';
+import { setUser, logLogin } from '../../services/firebase/analytics';
+import { setCrashlyticsUser } from '../../services/firebase/crashlytics';
 
 
 
@@ -151,6 +153,17 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
           await AsyncStorage.setItem('userData', JSON.stringify(res.user));
         }
 
+        const loggedUser = res?.user || {};
+        const userId = String(loggedUser.id || '');
+        if (userId) {
+          setUser(userId, {
+            email: loggedUser.email || '',
+            role: loggedUser.role || role,
+          });
+          setCrashlyticsUser(userId, loggedUser.email || '', loggedUser.name || '');
+        }
+        logLogin('email');
+
         Toast.show({
           type: 'success',
           text1: 'Login Successful',
@@ -188,6 +201,13 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       await AsyncStorage.setItem('userToken', 'static-front-end-token');
       await AsyncStorage.setItem('userData', JSON.stringify(staticUser));
       setShowOtpModal(false);
+
+      setUser( {
+        email: staticUser.email || '',
+        role: staticUser.role || role,
+      });
+      setCrashlyticsUser( staticUser.email || '', staticUser.name || '');
+      logLogin('otp');
 
       ToastAndroid.show('Static login successful!', ToastAndroid.SHORT);
       if (staticUser.role === 'candidate') navigation.replace('CandidateHome');

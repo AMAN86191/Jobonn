@@ -47,7 +47,7 @@ export const getCandidateProfileCompleteness = (user: any): CandidateCompletenes
 
   // Step 0: Personal Details (15%)
   const dob = getVal(['candidate.personal_detail.dob', 'candidate.user.dob', 'candidate.dob', 'PersonalDetails.date_of_birth', 'PersonalDetails.dateOfBirth', 'dob']);
-  if (dob) percentage += 2.5; else missingFields.push('Date of Birth');
+  if (dob) percentage += 3.5; else missingFields.push('Date of Birth');
 
   const gender = getVal(['candidate.personal_detail.gender', 'candidate.user.gender', 'candidate.gender', 'PersonalDetails.gender', 'gender']);
   if (gender) percentage += 2.5; else missingFields.push('Gender');
@@ -113,8 +113,8 @@ export const getCandidateProfileCompleteness = (user: any): CandidateCompletenes
   const profileImage = getVal(['candidate.docs.profile_img', 'candidate.profile_image', 'candidate_profile.profileImage', 'candidate_profile.profile_image', 'profileImage', 'profile_image']);
   if (profileImage) percentage += 3; else missingFields.push('Profile Photo');
 
-  const portfolio = getVal(['candidate.docs.portfolio_link', 'candidate.portfolio', 'candidate_profile.portfolio', 'portfolio']);
-  if (portfolio) percentage += 1;
+  // const portfolio = getVal(['candidate.docs.portfolio_link', 'candidate.portfolio', 'candidate_profile.portfolio', 'portfolio']);
+  // if (portfolio) percentage += 1;
 
   // Normalize final percentage
   const finalPercent = Math.min(Math.round(percentage), 100);

@@ -19,6 +19,7 @@ import JobCard from '../../components/Candidate_component/JobCard';
 import { Sliders } from 'lucide-react-native';
 import FilterModal, { FilterSection } from '../../components/Manager_component/FilterModal';
 import { jobs } from '../../data/jobonnStaticData';
+import { logJobSearch } from '../../services/firebase/analytics';
 
 const RECENT_SEARCHES = [
   've,jaipur',
@@ -93,6 +94,7 @@ const CandidateSearchScreen = ({ navigation }: any) => {
 
   const handleSearch = () => {
     setShowJobs(true);
+    logJobSearch(`${skills}, ${location}`);
   };
 
   const handleSelectFilter = (section: string, key: string) => {
