@@ -1,25 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity,
   TextInput, Pressable, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight, Check, Plus, X, MapPin, Briefcase, IndianRupee, GraduationCap, Users, Calendar, Gift, Award } from 'lucide-react-native';
+import { ChevronRight, Check, Plus, X, MapPin, Briefcase, IndianRupee, GraduationCap, Users, Calendar, Gift, Award, Globe } from 'lucide-react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import { Colors } from '../../theme/Colors';
 import { Typography } from '../../theme/Typography';
 import DatePickerInput from '../../components/forms/DatePickerInput';
 import { ToastAndroid, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect } from 'react';
 import SearchableDropdown from '../../components/forms/SearchableDropdown';
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
+import { useDispatch } from 'react-redux';
+import {
+  getJobDepartmentsSlice,
+  createJobDepartmentSlice,
+  getJobIndustriesSlice,
+  createJobIndustrySlice,
+  getJobTitlesSlice,
+  createJobTitleSlice,
+  getJobLocationsSlice,
+  createJobLocationSlice,
+  getSkillsByJobTitleSlice,
+  searchSkillsSlice,
+  createSkillSlice,
+  postJobSlice,
+} from '../../redux/PostJobSlice';
+import { useFocusEffect } from '@react-navigation/native';
+
 
 const STEPS = ['Job Details', 'Requirements', 'Preferences', 'Review'];
 
 const EMPLOYMENT_TYPES = ['Full-Time', 'Part-Time', 'Contract', 'Internship', 'Remote'];
 const EDUCATION_LEVELS = ['High School', 'Diploma', 'Graduate', 'Doctorate', 'Post Graduate'];
+const LANGUAGES_LIST = ['English', 'Hindi', 'Urdu', 'Punjabi', 'Bengali', 'Other'];
 
 const PREDEFINED_BENEFITS = [
   'Health Insurance',
@@ -33,9 +50,10 @@ const PREDEFINED_BENEFITS = [
 ];
 
 type StepData = {
+  industry: string;
   title: string;
   department: string;
-  location: string;
+  location: string[];
   employmentType: string;
   minSalary: string;
   maxSalary: string;
@@ -55,19 +73,21 @@ type StepData = {
   urgent: boolean;
   customQuestions: string[];
   questionInput: string;
+  languages: string[];
 };
 
 const INITIAL: StepData = {
+  industry: '',
   title: '',
   department: '',
-  location: '',
+  location: [],
   employmentType: '',
   minSalary: '',
   maxSalary: '',
   salaryType: 'yearly',
   description: '',
   category: '',
-  skills: ['React native', 'Android', 'iOS', 'Flutter', 'React', 'Node', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Swift', 'Kotlin', 'TypeScript', 'JavaScript', 'HTML', 'CSS', 'SQL', 'NoSQL', 'MongoDB', 'MySQL', 'PostgreSQL', 'SQLite', 'Firebase', 'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Git', 'GitHub', 'GitLab', 'Bitbucket', 'Jira', 'Trello', 'Asana', 'Slack', 'Zoom', 'Microsoft Teams', 'Google Meet'],
+  skills: ['React native', 'Android', 'iOS', 'Flutter', 'React', 'Node', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Swift', 'Kotlin', 'TypeScript', 'JavaScript', 'HTML', 'CSS'],
   skillInput: '',
   isFresher: true,
   minExperience: '',
@@ -80,6 +100,7 @@ const INITIAL: StepData = {
   urgent: false,
   customQuestions: [],
   questionInput: '',
+  languages: [],
 };
 
 const StepIndicator = ({ current, onChangeStep }: { current: number; onChangeStep: (step: number) => void }) => (
@@ -175,12 +196,120 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </View>
 );
 
-const PostJobScreen = ({ navigation, route }: any) => {
-  const editJob = route?.params?.job;
+const PostJobScreen = ({ navigation }: any) => {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<StepData>(INITIAL);
-  const [loading, setLoading] = useState(false);
   const [managerData, setManagerData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const dispatch = useDispatch<any>();
+  const [departmentsData, setDepartmentsData] = useState<any>(null);
+  const [industriesData, setIndustriesData] = useState<any>(null);
+  const [jobTitlesData, setJobTitlesData] = useState<any>(null);
+  const [locationsData, setLocationsData] = useState<any>(null);
+  const [searchedSkillsList, setSearchedSkillsList] = useState<string[]>([]);
+
+  const fetchAllData = useCallback(async () => {
+    try {
+      const depts = await dispatch(getJobDepartmentsSlice()).unwrap();
+      setDepartmentsData(depts);
+    } catch (e) {
+      console.log('Error fetching departments', e);
+    }
+    try {
+      const inds = await dispatch(getJobIndustriesSlice()).unwrap();
+      setIndustriesData(inds);
+    } catch (e) {
+      console.log('Error fetching industries', e);
+    }
+    try {
+      const titles = await dispatch(getJobTitlesSlice()).unwrap();
+      setJobTitlesData(titles);
+    } catch (e) {
+      console.log('Error fetching titles', e);
+    }
+    try {
+      const locs = await dispatch(getJobLocationsSlice()).unwrap();
+      setLocationsData(locs);
+    } catch (e) {
+      console.log('Error fetching locations', e);
+    }
+  }, [dispatch]);
+
+  useFocusEffect(useCallback(() => {
+    fetchAllData();
+  }, [fetchAllData]));
+
+  const departmentNames = useMemo(() => {
+    console.log('departmentsData', departmentsData)
+    return departmentsData?.job_departments
+      ?.filter((d: any) => typeof d === 'string' || Number(d?.status) === 1)
+      ?.map((d: any) => typeof d === 'string' ? d : (d.department_name || '')) || [];
+  }, [departmentsData]);
+
+  const industryNames = useMemo(() => {
+    console.log('industriesData', industriesData)
+    return industriesData?.job_industries
+      ?.filter((i: any) => typeof i === 'string' || Number(i?.status) === 1)
+      ?.map((i: any) => typeof i === 'string' ? i : (i.industry_name || '')) || [];
+  }, [industriesData]);
+
+  const jobTitleNames = useMemo(() => {
+    console.log('jobTitlesData', jobTitlesData)
+    return jobTitlesData?.job_titles?.map((t: any) => typeof t === 'string' ? t : (t.job_name || '')) || [];
+  }, [jobTitlesData]);
+
+  const locationNames = useMemo(() => {
+    console.log('locationsData', locationsData)
+    return locationsData?.job_locations?.map((l: any) => typeof l === 'string' ? l : (l.location_name || l.suggested_location_name)) || [];
+  }, [locationsData]);
+
+  const selectedJobTitleId = useMemo(() => {
+    if (!data.title || !jobTitlesData?.job_titles) return null;
+    const found = jobTitlesData.job_titles.find((t: any) => t.job_name === data.title);
+    return found?.id || null;
+  }, [data.title, jobTitlesData]);
+
+  useEffect(() => {
+    if (selectedJobTitleId) {
+      const fetchSkills = async () => {
+        try {
+          console.log('Fetching skills for job title ID:', selectedJobTitleId);
+          const response = await dispatch(getSkillsByJobTitleSlice(selectedJobTitleId)).unwrap();
+          console.log('Fetching skills for job title ID:', response)
+          const skillsList = response?.skills || [];
+          const skillNames = Array.from(
+            new Set(
+              skillsList
+                ?.filter((s: any) => s && s.skill_name)
+                ?.map((s: any) => s.skill_name)
+            )
+          ) as string[];
+          set('skills', skillNames);
+        } catch (e) {
+          console.log('Error fetching skills for title:', e);
+        }
+      };
+      fetchSkills();
+    }
+  }, [selectedJobTitleId, dispatch]);
+
+  const handleSearchSkills = useCallback(async (text: string) => {
+    if (text.trim().length >= 3) {
+      try {
+        const response = await dispatch(searchSkillsSlice(text.trim())).unwrap();
+        console.log('response search', response)
+        const skillsList = response?.skills || response || [];
+        console.log('skillList', skillsList)
+        const skillNames = skillsList?.map((s: any) => typeof s === 'string' ? s : (s.skill_name || '')) || [];
+        setSearchedSkillsList(skillNames);
+      } catch (e) {
+        console.log('Error searching skills:', e);
+      }
+    } else {
+      setSearchedSkillsList([]);
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     const loadManager = async () => {
@@ -190,93 +319,9 @@ const PostJobScreen = ({ navigation, route }: any) => {
     loadManager();
   }, []);
 
-  useEffect(() => {
-    if (editJob) {
-      // Parse salary (e.g. "12-15 LPA" or "20-30 Monthly")
-      let minSalary = '';
-      let maxSalary = '';
-      let salaryType: 'monthly' | 'yearly' = 'yearly';
-      if (editJob.salary) {
-        const cleanSalary = editJob.salary.toLowerCase();
-        if (cleanSalary.includes('month')) {
-          salaryType = 'monthly';
-        } else {
-          salaryType = 'yearly';
-        }
-        const cleanNums = editJob.salary.replace(/lpa/gi, '').replace(/monthly/gi, '').replace(/pm/gi, '').trim();
-        const parts = cleanNums.split('-');
-        if (parts.length === 2) {
-          minSalary = parts[0].trim();
-          maxSalary = parts[1].trim();
-        }
-      }
-
-      // Parse experience (e.g. "Fresher" or "3-5 years")
-      let isFresher = true;
-      let minExperience = '';
-      let maxExperience = '';
-      if (editJob.experience) {
-        if (editJob.experience.toLowerCase() === 'fresher') {
-          isFresher = true;
-        } else {
-          isFresher = false;
-          const cleanExp = editJob.experience.replace(' years', '').replace(' yrs', '').trim();
-          const parts = cleanExp.split('-');
-          if (parts.length === 2) {
-            minExperience = parts[0];
-            maxExperience = parts[1];
-          }
-        }
-      }
-
-      // Parse education
-      let educationArray: string[] = [];
-      if (editJob.education) {
-        if (Array.isArray(editJob.education)) {
-          educationArray = editJob.education;
-        } else if (typeof editJob.education === 'string') {
-          educationArray = editJob.education.split(',').map((e: string) => e.trim()).filter(Boolean);
-        }
-      }
-
-      setData({
-        title: editJob.title || '',
-        department: editJob.department || '',
-        location: editJob.location || '',
-        employmentType: editJob.job_type || editJob.employmentType || '',
-        minSalary: minSalary,
-        maxSalary: maxSalary,
-        salaryType: salaryType,
-        description: editJob.description || '',
-        category: editJob.category || '',
-        skills: editJob.skills || [],
-        skillInput: '',
-        isFresher: isFresher,
-        minExperience: minExperience,
-        maxExperience: maxExperience,
-        education: educationArray,
-        openings: editJob.openings?.toString() || editJob.vacancies?.toString() || '1',
-        benefits: editJob.benefits || [],
-        benefitInput: '',
-        applicationDeadline: editJob.applicationDeadline ? new Date(editJob.applicationDeadline) : null,
-        urgent: !!editJob.urgent,
-        customQuestions: editJob.custom_questions || editJob.questions || [],
-        questionInput: '',
-      });
-    }
-  }, [editJob]);
-
   const set = (key: keyof StepData, val: any) => setData(prev => ({ ...prev, [key]: val }));
 
-  const addSkill = () => {
-    const skill = data.skillInput.trim();
-    if (skill && !data.skills.includes(skill)) {
-      set('skills', [...data.skills, skill]);
-    }
-    set('skillInput', '');
-  };
 
-  const removeSkill = (s: string) => set('skills', data.skills.filter(x => x !== s));
 
   const addBenefit = (benefit?: string) => {
     const val = (benefit || data.benefitInput).trim();
@@ -298,8 +343,103 @@ const PostJobScreen = ({ navigation, route }: any) => {
 
   const removeQuestion = (q: string) => set('customQuestions', data.customQuestions.filter(x => x !== q));
 
+  const handlePostJob = async () => {
+    try {
+      setLoading(true);
+
+      const getJobTypeKey = (type: string) => {
+        switch (type) {
+          case 'Full-Time': return 'full_time';
+          case 'Part-Time': return 'part_time';
+          case 'Contract': return 'contract';
+          case 'Internship': return 'internship';
+          case 'Remote': return 'remote';
+          default: return type.toLowerCase().replace('-', '_');
+        }
+      };
+
+      const formatDate = (date: Date | null) => {
+        if (!date) return '';
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const location_ids: number[] = [];
+      const suggested_location_ids: number[] = [];
+
+      data.location.forEach(name => {
+        const found = locationsData?.job_locations?.find((l: any) =>
+          typeof l !== 'string' &&
+          (l.location_name?.toLowerCase() === name.toLowerCase() ||
+            l.suggested_location_name?.toLowerCase() === name.toLowerCase())
+        );
+        if (found) {
+          if (found.location_name) {
+            location_ids.push(found.id);
+          } else if (found.suggested_location_name) {
+            suggested_location_ids.push(found.id);
+          }
+        }
+      });
+
+      const selectedJobTitleId = (() => {
+        if (!data.title || !jobTitlesData?.job_titles) return null;
+        const found = jobTitlesData.job_titles.find((t: any) => t.job_name === data.title);
+        return found?.id || null;
+      })();
+
+      const selectedJobIndustryId = (() => {
+        if (!data.industry || !industriesData?.job_industries) return null;
+        const found = industriesData.job_industries.find((i: any) => i.industry_name === data.industry);
+        return found?.id || null;
+      })();
+
+      const selectedJobDepartmentId = (() => {
+        if (!data.department || !departmentsData?.job_departments) return null;
+        const found = departmentsData.job_departments.find((d: any) => d.department_name === data.department);
+        return found?.id || null;
+      })();
+
+      const payload = {
+        job_title_id: selectedJobTitleId ? String(selectedJobTitleId) : "",
+        job_industry_id: selectedJobIndustryId,
+        job_department_id: selectedJobDepartmentId,
+        job_type: getJobTypeKey(data.employmentType),
+        experience: data.isFresher ? 'Fresher' : `${data.minExperience}-${data.maxExperience} Years`,
+        education: data.education.join(', '),
+        openings: Number(data.openings) || 1,
+        location_id: location_ids,
+        suggested_location_id: suggested_location_ids,
+        salary_from: data.minSalary,
+        salary_to: data.maxSalary,
+        job_description: data.description,
+        benefits: data.benefits.join(', '),
+        languages: data.languages.join(', '),
+        is_urgent: data.urgent,
+        status: "active",
+        expiry_date: formatDate(data.applicationDeadline),
+        salary_type: data.salaryType,
+        question: data.customQuestions,
+      };
+
+      console.log('PostJob Payload:', payload);
+      ToastAndroid.show('Job published successfully!', ToastAndroid.SHORT);
+      const response = await dispatch(postJobSlice(payload)).unwrap();
+      console.log('PostJob response:', response);
+
+      navigation.goBack();
+    } catch (error: any) {
+      console.log('error', error);
+      ToastAndroid.show(error?.message || error?.response?.data?.message || 'Failed to process job request', ToastAndroid.LONG);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const canNext = () => {
-    if (step === 0) return data.title && data.department && data.employmentType;
+    if (step === 0) return data.industry && data.title && data.department && data.employmentType;
     if (step === 1) {
       const expValid = data.isFresher || (data.minExperience && data.maxExperience);
       return expValid && data.education && data.education.length > 0;
@@ -312,7 +452,7 @@ const PostJobScreen = ({ navigation, route }: any) => {
     if (target <= step) return true;
     for (let i = 0; i < target; i++) {
       if (i === 0) {
-        if (!(data.title && data.department && data.employmentType)) return false;
+        if (!(data.industry && data.title && data.department && data.employmentType)) return false;
       }
       if (i === 1) {
         const expValid = data.isFresher || (data.minExperience && data.maxExperience);
@@ -335,7 +475,7 @@ const PostJobScreen = ({ navigation, route }: any) => {
         {/* Header */}
         <CommanManagerHeader
           navigation={navigation}
-          title={editJob ? "Edit Job" : "Post a Job"}
+          title="Post a Job"
           onBack={() => step === 0 ? navigation.goBack() : setStep(s => s - 1)}
         />
 
@@ -350,65 +490,109 @@ const PostJobScreen = ({ navigation, route }: any) => {
           {/* Step 0: Job Details */}
           {step === 0 && (
             <Animated.View entering={FadeInRight.duration(350)}>
-              {/* <Field label="Job Title *">
-                <TextInput
-                  style={inputStyle}
-                  placeholder="e.g. Senior React Native Developer"
-                  placeholderTextColor={Colors.textSecondary}
-                  value={data.title}
-                  onChangeText={v => set('title', v)}
-                />
-              </Field> */}
-
-              <Field label="Job Title *">
+              <Field label="Industry *">
                 <SearchableDropdown
-                  data={[
-                    'Senior React Native Developer',
-                    'Full Stack Developer',
-                    'Backend Engineer (Laravel)',
-                    'UI/UX Designer',
-                    'Mobile Lead',
-                  ]}
-                  placeholder="e.g. Senior React Native Developer"
-                  value={data.title}
-                  onSelect={v => set('title', v)}
+                  data={industryNames}
+                  placeholder="Select or search industry"
+                  value={data.industry}
+                  onSelect={async v => {
+                    set('industry', v);
+                    if (v && !industryNames.includes(v)) {
+                      try {
+                        console.log('Creating new industry:', v);
+                        const payload = {
+                          industry_name: v
+                        }
+                        await dispatch(createJobIndustrySlice(payload as any)).unwrap();
+                        const inds = await dispatch(getJobIndustriesSlice()).unwrap();
+                        setIndustriesData(inds);
+                      } catch (err) {
+                        console.error('Failed to create industry', err);
+                      }
+                    }
+                  }}
                 />
               </Field>
 
-              {/* <Field label="Job Category *">
-                <SearchableDropdown
-                  data={JOB_CATEGORIES}
-                  placeholder="Select or search category"
-                  value={data.category}
-                  onSelect={v => set('category', v)}
-                />
-              </Field> */}
-              {/* 
-              <Field label="Department *">
-                <ChipSelect options={DEPARTMENTS} value={data.department} onSelect={v => set('department', v)} />
-              </Field> */}
               <Field label="Department *">
                 <SearchableDropdown
-                  data={[
-                    'Marketing',
-                    'Sales',
-                    'HR',
-                    'Engineering',
-                    'Finance',
-                  ]}
-                  placeholder="e.g. Marketing"
+                  data={departmentNames}
+                  placeholder="Select or search department"
                   value={data.department}
-                  onSelect={v => set('department', v)}
+                  onSelect={async v => {
+                    set('department', v);
+                    if (v && !departmentNames.includes(v)) {
+                      try {
+                        console.log('Creating new department:', v);
+                        const payload = {
+                          department_name: v
+                        }
+                        await dispatch(createJobDepartmentSlice(payload as any)).unwrap();
+                        const depts = await dispatch(getJobDepartmentsSlice()).unwrap();
+                        setDepartmentsData(depts);
+                      } catch (err) {
+                        console.error('Failed to create department', err);
+                      }
+                    }
+                  }}
+                />
+              </Field>
+
+              <Field label="Job Title *">
+                <SearchableDropdown
+                  data={jobTitleNames}
+                  placeholder="e.g. Senior React Native Developer"
+                  value={data.title}
+                  onSelect={async v => {
+                    set('title', v);
+                    if (v && !jobTitleNames.includes(v)) {
+                      try {
+                        console.log('Creating new job title:', v);
+                        const payload = {
+                          job_name: v
+                        }
+                        await dispatch(createJobTitleSlice(payload as any)).unwrap();
+                        const titles = await dispatch(getJobTitlesSlice()).unwrap();
+                        setJobTitlesData(titles);
+                      } catch (err) {
+                        console.error('Failed to create job title', err);
+                      }
+                    }
+                  }}
                 />
               </Field>
 
               <Field label="Location">
-                <TextInput
-                  style={inputStyle}
-                  placeholder="e.g. Bangalore / Remote"
-                  placeholderTextColor={Colors.textSecondary}
-                  value={data.location}
-                  onChangeText={v => set('location', v)}
+                <SearchableDropdown
+                  data={locationNames}
+                  placeholder="Select or search location"
+                  isMulti={true}
+                  selectedValues={data.location}
+                  onSelectMulti={async selectedList => {
+                    set('location', selectedList);
+                    const newLoc = selectedList.find(loc => !locationNames.includes(loc));
+                    if (newLoc) {
+                      try {
+                        console.log('Creating new location:', newLoc);
+                        const payload = {
+                          suggested_location_name: newLoc
+                        }
+                        const res = await dispatch(createJobLocationSlice(payload as any)).unwrap();
+                        console.log('res', res);
+                        if (res?.job_location) {
+                          setLocationsData((prev: any) => {
+                            if (!prev) return { job_locations: [res.job_location] };
+                            return {
+                              ...prev,
+                              job_locations: [...(prev.job_locations || []), res.job_location]
+                            };
+                          });
+                        }
+                      } catch (err) {
+                        console.error('Failed to create location', err);
+                      }
+                    }
+                  }}
                 />
               </Field>
 
@@ -515,32 +699,34 @@ const PostJobScreen = ({ navigation, route }: any) => {
               </Field>
 
               <Field label="Required Skills">
-                <View style={styles.skillInputRow}>
-                  <TextInput
-                    style={[inputStyle, styles.skillInputField]}
-                    placeholder="Add a skill..."
-                    placeholderTextColor={Colors.textSecondary}
-                    value={data.skillInput}
-                    onChangeText={v => set('skillInput', v)}
-                    onSubmitEditing={addSkill}
-                    returnKeyType="done"
-                  />
-                  <TouchableOpacity style={styles.addSkillBtn} onPress={addSkill}>
-                    <Plus color={Colors.white} size={wp('4.5%')} />
-                  </TouchableOpacity>
-                </View>
-                {data.skills.length > 0 && (
-                  <View style={styles.skillTags}>
-                    {data.skills.map(skill => (
-                      <View key={skill} style={styles.skillTag}>
-                        <Text style={styles.skillTagText}>{skill}</Text>
-                        <TouchableOpacity onPress={() => removeSkill(skill)}>
-                          <X color={Colors.primary} size={wp('3.5%')} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
+                <SearchableDropdown
+                  data={searchedSkillsList}
+                  placeholder="Search and select skills..."
+                  isMulti={true}
+                  selectedValues={data.skills}
+                  onSearchTextChange={handleSearchSkills}
+                  onSelectMulti={async (selectedList) => {
+                    set('skills', selectedList);
+                    const newlyAdded = selectedList.find(s => !searchedSkillsList.includes(s) && !data.skills.includes(s));
+                    if (newlyAdded) {
+                      try {
+                        const payload = {
+                          job_title_id: selectedJobTitleId,
+                          skill_name: newlyAdded
+                        }
+                        console.log('Creating new skill:', payload);
+                        const response = await dispatch(createSkillSlice(payload as any)).unwrap();
+                        console.log('Skill created successfully', response);
+                      } catch (err) {
+                        console.error('Failed to create skill', err);
+                      }
+                    }
+                  }}
+                />
+              </Field>
+
+              <Field label="Required Languages">
+                <MultiChipSelect options={LANGUAGES_LIST} value={data.languages} onSelect={v => set('languages', v)} />
               </Field>
             </Animated.View>
           )}
@@ -671,11 +857,13 @@ const PostJobScreen = ({ navigation, route }: any) => {
                 <View style={styles.reviewDivider} />
 
                 {[
-                  { label: 'Location', value: data.location || 'Not specified', icon: <MapPin size={wp('4%')} color={Colors.textSecondary} /> },
-                  { label: 'Category', value: data.category || 'Not specified', icon: <Briefcase size={wp('4%')} color={Colors.textSecondary} /> },
+                  { label: 'Industry', value: data.industry || 'Not specified', icon: <Globe size={wp('4%')} color={Colors.textSecondary} /> },
+                  { label: 'Department', value: data.department || 'Not specified', icon: <Briefcase size={wp('4%')} color={Colors.textSecondary} /> },
+                  { label: 'Location', value: data.location.length > 0 ? data.location.join(', ') : 'Not specified', icon: <MapPin size={wp('4%')} color={Colors.textSecondary} /> },
                   { label: 'Salary', value: data.minSalary && data.maxSalary ? `₹${data.minSalary}–${data.maxSalary} ${data.salaryType === 'yearly' ? 'LPA' : 'Monthly'}` : 'Not specified', icon: <IndianRupee size={wp('4%')} color={Colors.textSecondary} /> },
                   { label: 'Experience', value: data.isFresher ? 'Fresher' : `${data.minExperience}-${data.maxExperience} Years`, icon: <Award size={wp('4%')} color={Colors.textSecondary} /> },
                   { label: 'Education', value: data.education && data.education.length > 0 ? data.education.join(', ') : 'Not specified', icon: <GraduationCap size={wp('4%')} color={Colors.textSecondary} /> },
+                  { label: 'Languages', value: data.languages.length > 0 ? data.languages.join(', ') : 'Not specified', icon: <Globe size={wp('4%')} color={Colors.textSecondary} /> },
                   { label: 'Openings', value: data.openings || '1', icon: <Users size={wp('4%')} color={Colors.textSecondary} /> },
                   { label: 'Deadline', value: data.applicationDeadline ? data.applicationDeadline.toLocaleDateString('en-GB') : 'Open', icon: <Calendar size={wp('4%')} color={Colors.textSecondary} /> },
                   { label: 'Benefits', value: data.benefits.length > 0 ? `${data.benefits.length} Added` : 'None', icon: <Gift size={wp('4%')} color={Colors.textSecondary} /> },
@@ -749,41 +937,14 @@ const PostJobScreen = ({ navigation, route }: any) => {
               if (step < STEPS.length - 1) {
                 setStep(s => s + 1);
               } else {
-                try {
-                  setLoading(true);
-                  const payload = {
-                    title: data.title,
-                    company_name: managerData?.manager_profile?.companyName || 'JobOnn Partner',
-                    location: data.location,
-                    job_type: data.employmentType,
-                    experience: data.isFresher ? 'Fresher' : `${data.minExperience}-${data.maxExperience} years`,
-                    salary: `${data.minSalary}-${data.maxSalary} ${data.salaryType === 'yearly' ? 'LPA' : 'Monthly'}`,
-                    education: data.education.join(', '),
-                    description: data.description,
-                    category: data.category,
-                    skills: data.skills,
-                    benefits: data.benefits,
-                    custom_questions: data.customQuestions,
-                  };
-
-                  console.log('PostJob/UpdateJob Payload:', payload);
-
-                  await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
-                  ToastAndroid.show(editJob ? 'Job updated in static MVP data!' : 'Job published in static MVP data!', ToastAndroid.SHORT);
-                  navigation.goBack();
-                } catch (error: any) {
-                  console.log('error', error.response?.data?.message ?? error.message);
-                  ToastAndroid.show(error?.response?.data?.message || 'Failed to process job request', ToastAndroid.LONG);
-                } finally {
-                  setLoading(false);
-                }
+                await handlePostJob();
               }
             }}
             disabled={!canNext()}
             activeOpacity={0.85}
           >
             <Text style={styles.nextBtnText}>
-              {loading ? (editJob ? 'Updating...' : 'Posting...') : (step === STEPS.length - 1 ? (editJob ? 'Update Job' : 'Post Job') : 'Continue')}
+              {loading ? 'Posting...' : (step === STEPS.length - 1 ? 'Post Job' : 'Continue')}
             </Text>
             {loading ? (
               <ActivityIndicator color={Colors.white} size="small" />

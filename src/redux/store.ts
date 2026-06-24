@@ -2,12 +2,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import auth from './AuthSlice';
 import companyHome from './CompanyHomeSlice';
 import candidateProfile from './CandidateProfileSlice';
+import postJob from './PostJobSlice';
 
 export const store = configureStore({
   reducer: {
     auth: auth,
     companyHome: companyHome,
     candidateProfile: candidateProfile,
+    postJob: postJob,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

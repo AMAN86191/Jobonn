@@ -12,7 +12,7 @@ import {
   UIManager,
 } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { Search, ChevronDown, Plus, Check } from 'lucide-react-native';
+import { Search, ChevronDown, Plus, Check, X } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 import { Typography } from '../../theme/Typography';
 
@@ -26,6 +26,10 @@ interface SearchableDropdownProps {
   value?: string;
   onSelect?: (value: string) => void;
   label?: string;
+  isMulti?: boolean;
+  selectedValues?: string[];
+  onSelectMulti?: (values: string[]) => void;
+  onSearchTextChange?: (text: string) => void;
 }
 
 const SearchableDropdown = ({
@@ -34,15 +38,25 @@ const SearchableDropdown = ({
   value: initialValue = '',
   onSelect,
   label,
+  isMulti = false,
+  selectedValues = [],
+  onSelectMulti,
+  onSearchTextChange,
 }: SearchableDropdownProps) => {
-  const [query, setQuery] = useState(initialValue);
+  const [query, setQuery] = useState(isMulti ? '' : initialValue);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(data);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    setQuery(initialValue);
-  }, [initialValue]);
+    if (!isMulti) {
+      setQuery(initialValue);
+    }
+  }, [initialValue, isMulti]);
+
+  React.useEffect(() => {
+    setItems(data);
+  }, [data]);
 
   const filteredData = useMemo(() => {
     if (!query.trim()) return items;
@@ -65,10 +79,26 @@ const SearchableDropdown = ({
     }
   };
 
-  const handleSelect = (value: string) => {
-    setQuery(value);
-    toggleDropdown(false);
-    onSelect?.(value);
+  const toggleSelection = (item: string) => {
+    let updated: string[];
+    if (selectedValues.includes(item)) {
+      updated = selectedValues.filter(x => x !== item);
+    } else {
+      updated = [...selectedValues, item];
+    }
+    onSelectMulti?.(updated);
+  };
+
+  const handleSelect = (item: string) => {
+    if (isMulti) {
+      toggleSelection(item);
+      setQuery('');
+      toggleDropdown(false);
+    } else {
+      setQuery(item);
+      toggleDropdown(false);
+      onSelect?.(item);
+    }
   };
 
   const handleAddNew = () => {
@@ -83,7 +113,21 @@ const SearchableDropdown = ({
       const updated = [trimmed, ...items];
       setItems(updated);
     }
-    handleSelect(trimmed);
+
+    if (isMulti) {
+      toggleSelection(trimmed);
+      setQuery('');
+      toggleDropdown(false);
+    } else {
+      handleSelect(trimmed);
+    }
+  };
+
+  const isItemSelected = (item: string) => {
+    if (isMulti) {
+      return selectedValues.includes(item);
+    }
+    return query === item || initialValue === item;
   };
 
   return (
@@ -99,8 +143,8 @@ const SearchableDropdown = ({
           onFocus={() => toggleDropdown(true)}
           onChangeText={text => {
             setQuery(text);
-            onSelect?.(text); // Update parent state as user types
             if (!open) toggleDropdown(true);
+            onSearchTextChange?.(text);
           }}
           style={styles.input}
         />
@@ -121,15 +165,18 @@ const SearchableDropdown = ({
             nestedScrollEnabled={true}
           >
             {filteredData.length > 0 ? (
-              filteredData.map((item, index) => (
-                <TouchableOpacity
-                  key={item + index}
-                  style={[styles.item, query === item && styles.itemSelected]}
-                  onPress={() => handleSelect(item)}>
-                  <Text style={[styles.itemText, query === item && styles.itemTextSelected]}>{item}</Text>
-                  {query === item && <Check size={wp('4%')} color={Colors.primary} strokeWidth={3} />}
-                </TouchableOpacity>
-              ))
+              filteredData.map((item, index) => {
+                const selected = isItemSelected(item);
+                return (
+                  <TouchableOpacity
+                    key={item + index}
+                    style={[styles.item, selected && styles.itemSelected]}
+                    onPress={() => handleSelect(item)}>
+                    <Text style={[styles.itemText, selected && styles.itemTextSelected]}>{item}</Text>
+                    {selected && <Check size={wp('4%')} color={Colors.primary} strokeWidth={3} />}
+                  </TouchableOpacity>
+                );
+              })
             ) : (
               <TouchableOpacity
                 style={styles.addItem}
@@ -142,6 +189,19 @@ const SearchableDropdown = ({
             )}
           </ScrollView>
         </Animated.View>
+      )}
+
+      {isMulti && selectedValues.length > 0 && (
+        <View style={styles.chipsContainer}>
+          {selectedValues.map(val => (
+            <View key={val} style={styles.multiChip}>
+              <Text style={styles.multiChipText}>{val}</Text>
+              <TouchableOpacity onPress={() => toggleSelection(val)} style={styles.multiChipClose}>
+                <X size={wp('3.5%')} color={Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -235,5 +295,32 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp('1.5%'),
+    marginTop: hp('1%'),
+    marginBottom: hp('0.5%'),
+  },
+  multiChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary + '15',
+    borderRadius: wp('1%'),
+    paddingHorizontal: wp('2%'),
+    paddingVertical: hp('0.4%'),
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  multiChipText: {
+    ...Typography.bodySmall,
+    color: Colors.primary,
+    fontSize: wp('2.8%'),
+    fontWeight: '600',
+    marginRight: wp('1%'),
+  },
+  multiChipClose: {
+    padding: wp('0.5%'),
   },
 });
