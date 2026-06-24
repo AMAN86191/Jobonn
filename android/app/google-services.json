@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "830914970364",
+    "project_id": "jobonn-7bc90",
+    "storage_bucket": "jobonn-7bc90.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:830914970364:android:63f25c16d1ad7bd778cd79",
+        "android_client_info": {
+          "package_name": "com.jobonn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1GArIzwm8VRSx6fnmnYf3eo_impOMMk8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -18,8 +18,14 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import { Plus, Trash2, CheckCircle2 } from 'lucide-react-native';
 import CustomInput from '../../components/inputs/CustomInput';
 import MainManagerHeader from '../../components/Manager_component/MainManagerHeader';
+import { useDispatch } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CompleteRegistrationSlice } from '../../redux/AuthSlice';
+import { getProfileCompleteness } from '../../utils/profileCompleteness';
+import UploadCard from '../../components/forms/UploadCard';
 
 const ManagerEditProfileScreen = ({ navigation, route }: any) => {
+  const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
   
   // Get initial user data from route
@@ -27,6 +33,13 @@ const ManagerEditProfileScreen = ({ navigation, route }: any) => {
 
   const [saving, setSaving] = useState(false);
   
+  const [companyLogo, setCompanyLogo] = useState<any>(
+    user?.manager_profile?.companyLogo ? { uri: user.manager_profile.companyLogo } : null
+  );
+  const [coverImage, setCoverImage] = useState<any>(
+    user?.manager_profile?.coverImage ? { uri: user.manager_profile.coverImage } : null
+  );
+
   // Initialize State
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -45,9 +58,11 @@ const ManagerEditProfileScreen = ({ navigation, route }: any) => {
   });
 
   const [awards, setAwards] = useState(
-    user?.manager_profile?.awards || [
-      { title: '', year: '', description: '' }
-    ]
+    (user?.manager_profile?.awards || []).map((a: any) => ({
+      title: a.title || '',
+      year: a.year || a.date || '',
+      description: a.description || a.desc || ''
+    }))
   );
 
   const updateField = (key: string, value: string) => {
@@ -72,15 +87,79 @@ const ManagerEditProfileScreen = ({ navigation, route }: any) => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      // Mock Save Request
-      setTimeout(() => {
-        setSaving(false);
-        ToastAndroid.show('Profile updated successfully!', ToastAndroid.SHORT);
-        navigation.goBack();
-      }, 1000);
-    } catch (_error) {
+
+      let companyId = '';
+      try {
+        const storedUser = await AsyncStorage.getItem('userData');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          companyId = parsed.company_id || parsed.company?.id || parsed.id || '';
+        }
+      } catch (err) {
+        console.log('Error reading company_id from AsyncStorage', err);
+      }
+
+      const formDataPayload = new FormData();
+      formDataPayload.append('company_id', String(companyId || ''));
+      formDataPayload.append('company_name', formData.companyName || '');
+      formDataPayload.append('office_location', formData.location || '');
+      formDataPayload.append('industry_type', formData.industry || '');
+      formDataPayload.append('company_size', formData.companySize || '');
+      formDataPayload.append('company_web_url', formData.website || '');
+      formDataPayload.append('company_about', formData.bio || '');
+      formDataPayload.append('gst_no', formData.gstNumber || '');
+      formDataPayload.append('founded_date', formData.foundedIn || '');
+      
+      awards.forEach((award: any, index: number) => {
+        formDataPayload.append(`awards[${index}][award_title]`, award.title || '');
+        formDataPayload.append(`awards[${index}][award_date]`, award.year || '');
+        formDataPayload.append(`awards[${index}][desc]`, award.description || '');
+      });
+
+      if (companyLogo && companyLogo.uri && (companyLogo.uri.startsWith('file:') || companyLogo.uri.startsWith('content:') || companyLogo.uri.startsWith('ph:'))) {
+        formDataPayload.append('company_logo', {
+          uri: companyLogo.uri,
+          name: companyLogo.name || 'logo.png',
+          type: companyLogo.type || 'image/png'
+        } as any);
+      }
+
+      if (coverImage && coverImage.uri && (coverImage.uri.startsWith('file:') || coverImage.uri.startsWith('content:') || coverImage.uri.startsWith('ph:'))) {
+        formDataPayload.append('cover_img', {
+          uri: coverImage.uri,
+          name: coverImage.name || 'cover.jpg',
+          type: coverImage.type || 'image/jpeg'
+        } as any);
+      }
+
+      console.log('Submitting updated company registration payload:', formDataPayload);
+
+      const res = await dispatch(CompleteRegistrationSlice(formDataPayload) as any).unwrap();
+      console.log('Update profile response:', res);
+
+      // Save updated company in AsyncStorage
+      if (res?.company) {
+        const storedUser = await AsyncStorage.getItem('userData');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          const completeness = getProfileCompleteness(res.company);
+          const newUserData = {
+            ...parsed,
+            ...(res.company.user || {}),
+            company: res.company,
+            profile_completed: completeness.isComplete,
+          };
+          await AsyncStorage.setItem('userData', JSON.stringify(newUserData));
+        }
+      }
+
+      ToastAndroid.show('Profile updated successfully!', ToastAndroid.SHORT);
+      navigation.goBack();
+    } catch (error: any) {
+      console.log('Error updating profile:', error);
+      Alert.alert('Error', error?.message || 'Failed to save changes.');
+    } finally {
       setSaving(false);
-      Alert.alert('Error', 'Failed to save changes.');
     }
   };
 
@@ -109,6 +188,20 @@ const ManagerEditProfileScreen = ({ navigation, route }: any) => {
           {/* About Company */}
           <Text style={styles.sectionTitle}>About Company</Text>
           <View style={styles.card}>
+            <UploadCard
+              label="Company Logo"
+              type="image"
+              value={companyLogo}
+              onChange={(logo: any) => setCompanyLogo(logo)}
+              error=""
+            />
+            <UploadCard
+              label="Cover Image"
+              type="image"
+              value={coverImage}
+              onChange={(cover: any) => setCoverImage(cover)}
+              error=""
+            />
             <CustomInput label="Company Name" value={formData.companyName} onChangeText={(t: string) => updateField('companyName', t)} placeholder="Enter company name" />
             <CustomInput label="Website" value={formData.website} onChangeText={(t: string) => updateField('website', t)} placeholder="e.g. techmark.in" />
             <CustomInput 

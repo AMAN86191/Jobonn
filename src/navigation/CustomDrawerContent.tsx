@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { DrawerContentComponentProps } from '@react-navigation/drawer';
+import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
 import { Home, Briefcase, Users, Calendar, User, LogOut, X, Mail, ChevronRight, FileText, BarChart3, CreditCard, FileClock } from 'lucide-react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { RFValue } from 'react-native-responsive-fontsize';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../theme/Colors';
+import { useDispatch } from 'react-redux';
+import { LogoutSlice } from '../redux/AuthSlice';
+import Toast from 'react-native-toast-message';
 
 const managerDrawerItems = [
   { label: 'Home', icon: Home, routeName: 'ManagerHomeTab' },
@@ -15,6 +18,7 @@ const managerDrawerItems = [
   { label: 'Reports', icon: BarChart3, routeName: 'ManagerAnalytics', root: true },
   { label: 'Packages', icon: CreditCard, routeName: 'PackageManagement', root: true },
   { label: 'Schedule Interviews', icon: Calendar, routeName: 'ManagerInterviewsTab' },
+  { label: 'Terms & Conditions', icon: FileText, routeName: 'TermsAndConditions', root: true },
   // { label: 'Audit Logs', icon: FileClock, routeName: 'AuditLogs', root: true },
 ];
 
@@ -24,11 +28,14 @@ const candidateDrawerItems = [
   { label: 'Applied Jobs', icon: FileText, routeName: 'AppliedJobs' },
   { label: 'Invites', icon: Mail, routeName: 'InvitesTab' },
   { label: 'Profile', icon: User, routeName: 'ProfileTab' },
+  { label: 'Terms & Conditions', icon: FileText, routeName: 'TermsAndConditions' },
 ];
 
 export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
   const { navigation, state } = props;
   const [user, setUser] = useState<any>(null);
+  const dispatch = useDispatch();
+  const drawerStatus = useDrawerStatus();
 
   useEffect(() => {
     const loadUser = async () => {
@@ -36,13 +43,13 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
       if (data) setUser(JSON.parse(data));
     };
     loadUser();
-  }, []);
+  }, [drawerStatus]);
 
   const isCandidate = state.routes[0]?.name === 'CandidateTabNavigator';
   const drawerItems = isCandidate ? candidateDrawerItems : managerDrawerItems;
 
-  const name = user?.name || (isCandidate ? 'User' : 'Manager');
-  const email = user?.email || (isCandidate ? 'user@gmail.com' : 'manager@jobonn.com');
+  const name = user?.name || (isCandidate ? 'User' : 'Company');
+  const email = user?.email || (isCandidate ? 'user@gmail.com' : 'company@jobonn.com');
 
   const nestedState = state.routes[0]?.state;
   const activeTabName = nestedState
@@ -51,8 +58,8 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
 
   const handleNavigate = (routeName: string) => {
     if (isCandidate) {
-      if (routeName === 'AppliedJobs') {
-        navigation.navigate('AppliedJobs');
+      if (routeName === 'AppliedJobs' || routeName === 'TermsAndConditions') {
+        navigation.navigate(routeName);
       } else {
         navigation.navigate('CandidateTabNavigator', { screen: routeName });
       }
@@ -67,12 +74,46 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
     navigation.closeDrawer();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     navigation.closeDrawer();
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login', params: { role: isCandidate ? 'candidate' : 'manager' } }],
-    });
+    try {
+      const res = await dispatch(LogoutSlice() as any).unwrap();
+      console.log("Logout Response:", res);
+
+      if (res?.status === true || res?.status_code === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: res?.message || 'Logged out successfully.',
+        });
+
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userData');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login', params: { role: isCandidate ? 'candidate' : 'company' } }],
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Logout Failed',
+          text2: res?.message || 'Something went wrong.',
+        });
+      }
+    } catch (error: any) {
+      console.warn('Logout API failed:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Logout Failed',
+        text2: error?.message || 'Network error. Logging out locally...',
+      });
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login', params: { role: isCandidate ? 'candidate' : 'company' } }],
+      });
+    }
   };
 
   return (
@@ -97,7 +138,7 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
       <View style={styles.bannerContainer}>
         <View style={styles.bannerContent}>
           <Text style={styles.bannerText}>
-            {isCandidate 
+            {isCandidate
               ? 'Find the perfect job\nthat matches\nyour skills.'
               : 'Hire the best talent\nto build your\ndream team.'}
           </Text>
@@ -238,7 +279,7 @@ const styles = StyleSheet.create({
     gap: wp('2%'),
   },
   menuItemText: {
-    fontSize: RFValue(10.5),
+    fontSize: RFValue(10),
     color: Colors.textSecondary,
     marginLeft: wp('2%'),
   },

@@ -9,14 +9,23 @@ import { Colors } from './src/theme'
 import { Provider } from 'react-redux';
 import { store } from './src/redux/store';
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import Toast from 'react-native-toast-message'
+import { logAppOpen } from './src/services/firebase/analytics'
+import { crashTest } from './src/services/firebase/crashlytics'
 
 const App = () => {
   const { isRestartRequired, newReleaseBundle } = useStallionUpdate()
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
+
+  useEffect(() => {
+    crashTest()
+    logAppOpen();
+  }, []);
+
   useEffect(() => {
     const subscription: any = addEventListener((event: any) => {
-      if (event.type === 'DOWNLOAD_STARTED') {
+      if (event.type === 'DOWNLOAD_STARTED') { 
         setIsDownloading(true)
         setDownloadProgress(0)
       } else if (event.type === 'DOWNLOAD_PROGRESS_PROD') {
@@ -37,11 +46,12 @@ const App = () => {
   return (
     <View style={styles.container}>
       <Provider store={store}>
-      <SafeAreaProvider>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <Allroute />
-      </SafeAreaProvider>
-    </Provider>
+        <SafeAreaProvider>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <Allroute />
+          <Toast />
+        </SafeAreaProvider>
+      </Provider>
 
 
       {/* Downloading Banner */}

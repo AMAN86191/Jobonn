@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, StatusBar,
   TouchableOpacity, KeyboardAvoidingView, Platform,
+  ToastAndroid,
 } from 'react-native';
 import {
   widthPercentageToDP as wp,
@@ -26,8 +27,14 @@ import { RootStackParamList } from '../../navigation/Allroute';
 import AppBackground from '../../components/layout/AppBackground';
 import OTPVerificationModal from '../../components/modals/OTPVerificationModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ToastAndroid } from 'react-native';
+import { useDispatch } from 'react-redux';
+import { LoginSlice } from '../../redux/AuthSlice';
+import Toast from 'react-native-toast-message';
 import { candidateProfile, recruiterProfile } from '../../data/jobonnStaticData';
+import { getProfileCompleteness } from '../../utils/profileCompleteness';
+import { setUser, logLogin } from '../../services/firebase/analytics';
+import { setCrashlyticsUser } from '../../services/firebase/crashlytics';
+
 
 
 type Props = {
@@ -36,6 +43,7 @@ type Props = {
 };
 
 const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
+  const dispatch = useDispatch();
   const role = route.params?.role ?? 'candidate';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,7 +98,6 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleLogin = async () => {
-    const staticUser = role === 'candidate' ? candidateProfile : recruiterProfile;
     if (loginMethod === 'phone') {
       if (!validatePhone()) return;
       try {
@@ -106,19 +113,79 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       if (!validateEmail()) return;
       try {
         setLoading(true);
-        await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
-        await AsyncStorage.setItem('userToken', 'static-front-end-token');
-        await AsyncStorage.setItem('userData', JSON.stringify(staticUser));
+        const payload = {
+          email: email,
+          password: password,
+        };
+        const res = await dispatch(LoginSlice(payload) as any).unwrap();
+        console.log('Login response:', res);
 
-        ToastAndroid.show('Static login successful!', ToastAndroid.SHORT);
-        if (staticUser.role === 'candidate') navigation.replace('CandidateHome');
-        else navigation.replace('ManagerHome');
+        if (res?.status === false || res?.status_code === 401) {
+          Toast.show({
+            type: 'error',
+            text1: 'Login Failed',
+            text2: res?.message || 'Invalid credentials.',
+          });
+          return;
+        }
+
+        if (res?.token) {
+          await AsyncStorage.setItem('userToken', res.token);
+        }
+        if (res?.company) {
+          const completeness = getProfileCompleteness(res.company);
+          const userData = {
+            ...(res.user || {}),
+            company: res.company,
+            profile_completed: completeness.isComplete,
+          };
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        } else if (res?.candidate || res?.user?.candidate || res?.user?.role === 'candidate' || res?.role === 'candidate') {
+          const candObj = res.candidate || res.user?.candidate;
+          const userData = {
+            ...(res.user || {}),
+            candidate: candObj,
+            role: 'candidate',
+            profile_completed: !!(candObj?.designation || candObj?.profile_summery || candObj?.profile_summary),
+          };
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        } else if (res?.user) {
+          await AsyncStorage.setItem('userData', JSON.stringify(res.user));
+        }
+
+        const loggedUser = res?.user || {};
+        const userId = String(loggedUser.id || '');
+        if (userId) {
+          setUser(userId, {
+            email: loggedUser.email || '',
+            role: loggedUser.role || role,
+          });
+          setCrashlyticsUser(userId, loggedUser.email || '', loggedUser.name || '');
+        }
+        logLogin('email');
+
+        Toast.show({
+          type: 'success',
+          text1: 'Login Successful',
+          text2: res?.message || 'Welcome back!',
+        });
+
+        const userRole = res?.role || res?.user?.role || role;
+        if (userRole === 'candidate') {
+          navigation.replace('CandidateHome');
+        } else {
+          navigation.replace('ManagerHome');
+        }
       } catch (error: any) {
-        ToastAndroid.show(error?.message || 'Static login failed', ToastAndroid.LONG);
+        console.error('Login error:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: error?.message || 'Invalid email or password.',
+        });
       } finally {
         setLoading(false);
       }
-
     }
   };
 
@@ -134,6 +201,13 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       await AsyncStorage.setItem('userToken', 'static-front-end-token');
       await AsyncStorage.setItem('userData', JSON.stringify(staticUser));
       setShowOtpModal(false);
+
+      setUser( {
+        email: staticUser.email || '',
+        role: staticUser.role || role,
+      });
+      setCrashlyticsUser( staticUser.email || '', staticUser.name || '');
+      logLogin('otp');
 
       ToastAndroid.show('Static login successful!', ToastAndroid.SHORT);
       if (staticUser.role === 'candidate') navigation.replace('CandidateHome');
@@ -290,6 +364,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
         isVisible={showOtpModal}
         onClose={() => setShowOtpModal(false)}
         email={phone}
+        phone={phone}
         onVerify={handleVerifyOtp}
         loading={otpLoading}
         externalError={otpError}

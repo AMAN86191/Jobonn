@@ -16,10 +16,11 @@ interface OTPVerificationModalProps {
   isVisible: boolean;
   onClose: () => void;
   email: string;
-  onVerify: (otp: string) => void;
+  onVerify: (otp: string, phone: string) => void;
   loading?: boolean;
   context?: 'login' | 'forgot' | 'signup';
   externalError?: string;
+  phone: string;
 }
 
 const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
@@ -29,9 +30,10 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
   onVerify,
   loading: externalLoading,
   context = 'forgot',
-  externalError
+  externalError,
+  phone
 }) => {
-  const [otp, setOtp] = useState<string[]>(['', '', '', '']);
+  const [otp, setOtp] = useState<string[]>(['', '', '', '','','']);
   const [internalLoading, setInternalLoading] = useState(false);
   const [error, setError] = useState('');
   const inputs = useRef<TextInput[]>([]);
@@ -40,7 +42,7 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
 
   useEffect(() => {
     if (isVisible) {
-      setOtp(['', '', '', '']);
+      setOtp(['', '', '', '','','']);
       setError('');
       // Auto focus first input when modal opens
       setTimeout(() => {
@@ -53,7 +55,7 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
     const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
-    if (text && index < 3) inputs.current[index + 1]?.focus();
+    if (text && index < 5) inputs.current[index + 1]?.focus();
     if (newOtp.every(v => v !== '')) setError('');
     if (externalError) {
       // We can't clear externalError directly since it's a prop, 
@@ -69,14 +71,15 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
 
   const handleVerify = () => {
     if (otp.some(v => !v)) {
-      setError('Please enter the complete 4-digit OTP');
+      setError('Please enter the complete 6-digit OTP');
       return;
     }
     setError('');
-    
+
     const otpString = otp.join('');
+
     if (onVerify) {
-      onVerify(otpString);
+      onVerify(otpString, phone);
     } else {
       // Default behavior if onVerify isn't provided (for testing)
       setInternalLoading(true);
@@ -115,8 +118,8 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
 
                 <Text style={styles.title}>Verify OTP</Text>
                 <Text style={styles.subtitle}>
-                  We've sent a 4-digit code to{'\n'}
-                  <Text style={styles.emailText}>{email}</Text>
+                  We've sent a 6-digit code to{'\n'}
+                  <Text style={styles.emailText}>{phone}</Text>
                 </Text>
 
                 {/* OTP Boxes */}
@@ -136,13 +139,13 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
                     />
                   ))}
                 </View>
-                
+
                 {(error || externalError) ? <Text style={styles.errorText}>{error || externalError}</Text> : null}
 
-                <CustomButton 
-                  title="Verify & Continue" 
-                  onPress={handleVerify} 
-                  loading={isLoading} 
+                <CustomButton
+                  title="Verify & Continue"
+                  onPress={handleVerify}
+                  loading={isLoading}
                 />
 
                 <View style={styles.resendRow}>
@@ -202,8 +205,8 @@ const styles = StyleSheet.create({
     paddingBottom: hp('2%'),
   },
   iconBox: {
-    width: wp('18%'),
-    height: wp('18%'),
+    width: wp('15%'),
+    height: wp('15%'),
     borderRadius: wp('5%'),
     backgroundColor: Colors.primary + '15',
     justifyContent: 'center',
@@ -234,8 +237,8 @@ const styles = StyleSheet.create({
     gap: wp('3%'),
   },
   otpBox: {
-    width: wp('14%'),
-    height: wp('14%'),
+    width: wp('12%'),
+    height: wp('12%'),
     borderRadius: wp('3.5%'),
     borderWidth: 1.5,
     borderColor: Colors.border,

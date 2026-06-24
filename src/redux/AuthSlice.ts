@@ -1,5 +1,56 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { SendOtp, VerifyOtp } from '../api/AuthProvider';
+import { 
+  SendOtp, VerifyOtp, SetPassword, CompleteRegistration, LoginUser, LogoutUser, UpdateCompanyProfile,
+  SendOtpCandidate, VerifyOtpCandidate, SetPasswordCandidate, CompleteRegistrationCandidate
+} from '../api/AuthProvider';
+
+export const SendOtpCandidateSlice = createAsyncThunk(
+  'auth/SendOtpCandidateSlice',
+  async (data: any, { rejectWithValue }) => {
+    try {
+      const responseData = await SendOtpCandidate(data);
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  },
+);
+
+export const VerifyOtpCandidateSlice = createAsyncThunk(
+  'auth/VerifyOtpCandidateSlice',
+  async (data: any, { rejectWithValue }) => {
+    try {
+      const responseData = await VerifyOtpCandidate(data);
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  },
+);
+
+export const SetPasswordCandidateSlice = createAsyncThunk(
+  'auth/SetPasswordCandidateSlice',
+  async (data: any, { rejectWithValue }) => {
+    try {
+      const responseData = await SetPasswordCandidate(data);
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  },
+);
+
+export const CompleteRegistrationCandidateSlice = createAsyncThunk(
+  'auth/CompleteRegistrationCandidateSlice',
+  async (formData: FormData, { rejectWithValue }) => {
+    try {
+      const responseData = await CompleteRegistrationCandidate(formData);
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  },
+);
 
 export const SendOtpSlice = createAsyncThunk(
     'auth/SendOtpSlice',
@@ -14,7 +65,7 @@ export const SendOtpSlice = createAsyncThunk(
   );
 
 export const VerifyOtpSlice = createAsyncThunk(
-    'auth/SendOtpSlice',
+    'auth/VerifyOtpSlice',
     async (data: any, { rejectWithValue }) => {
       try {
         const responseData = await VerifyOtp(data);
@@ -24,6 +75,65 @@ export const VerifyOtpSlice = createAsyncThunk(
       }
     },
   );
+
+export const SetPasswordSlice = createAsyncThunk(
+    'auth/SetPasswordSlice',
+    async (data: any, { rejectWithValue }) => {
+      try {
+        const responseData = await SetPassword(data);
+        return responseData;
+      } catch (error) {
+        return rejectWithValue(error);
+      }
+    },
+  );
+
+export const CompleteRegistrationSlice = createAsyncThunk(
+    'auth/CompleteRegistrationSlice',
+    async (formData: FormData, { rejectWithValue }) => {
+      try {
+        const responseData = await CompleteRegistration(formData);
+        return responseData;
+      } catch (error) {
+        return rejectWithValue(error);
+      }
+    },
+  );
+export const UpdateCompanyProfileSlice = createAsyncThunk(
+    'auth/UpdateCompanyProfile',
+    async (formData: FormData, { rejectWithValue }) => {
+      try {
+        const responseData = await UpdateCompanyProfile(formData);
+        return responseData;
+      } catch (error) {
+        return rejectWithValue(error);
+      }
+    },
+  );
+
+export const LoginSlice = createAsyncThunk(
+    'auth/LoginSlice',
+    async (data: any, { rejectWithValue }) => {
+      try {
+        const responseData = await LoginUser(data);
+        return responseData;
+      } catch (error) {
+        return rejectWithValue(error);
+      }
+    },
+  );
+
+export const LogoutSlice = createAsyncThunk(
+  'auth/LogoutSlice',
+  async (_, { rejectWithValue }) => {
+    try {
+      const responseData = await LogoutUser();
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',

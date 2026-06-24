@@ -6,6 +6,8 @@ import {
   Text,
   TouchableOpacity,
   Modal,
+  Image,
+  Linking,
 } from 'react-native';
 import {
   widthPercentageToDP as wp,
@@ -97,56 +99,95 @@ export const CircularProgress = ({ value }: { value: number }) => {
   );
 };
 
-export const ProfileHeaderInfo = ({ user, profile, onEdit }: { user: any; profile: any; onEdit?: () => void }) => (
-  <View style={styles.profileHeader}>
-    <View style={styles.avatarWrap}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {user.name[0].toUpperCase()}
+export const ProfileHeaderInfo = ({ user, profile, completenessValue, onEdit }: { user: any; profile: any; completenessValue: number; onEdit?: () => void }) => {
+  const imageUrl = profile?.profile_image
+    ? (profile.profile_image.startsWith('http') ? profile.profile_image : `https://admin.jobonn.in/storage/${profile.profile_image}`)
+    : '';
+  return (
+    <View style={styles.profileHeader}>
+      <View style={styles.avatarWrap}>
+        <TouchableOpacity
+          style={styles.avatar}
+          onPress={onEdit}
+          activeOpacity={onEdit ? 0.7 : 1}
+        >
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={{ width: '100%', height: '100%', borderRadius: wp('9%') }} />
+          ) : (
+            <Text style={styles.avatarText}>
+              {(user?.name || 'U')[0].toUpperCase()}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.profileInfo}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{user?.name || 'User'}</Text>
+          <BadgeCheck size={RFValue(12)} color={Colors.primary} fill={Colors.primaryLight} style={{ marginLeft: wp('1%') }} />
+        </View>
+
+        <Text style={styles.designation}>
+          {profile?.jobTitle || profile?.designation || 'Candidate'}
         </Text>
-      </View>
-    </View>
 
-    <View style={styles.profileInfo}>
-      <View style={styles.nameRow}>
-        <Text style={styles.name}>{user.name}</Text>
-        <BadgeCheck size={RFValue(12)} color={Colors.primary} fill={Colors.primaryLight} style={{ marginLeft: wp('1%') }} />
-      </View>
-
-      <Text style={styles.designation}>
-        {profile.jobTitle}
-      </Text>
-
-      <View style={styles.locationRow}>
+        {/* <View style={styles.locationRow}>
         <MapPin size={RFValue(9)} color={Colors.textSecondary} />
-        <Text style={styles.locationText}>Jaipur, Rajasthan, India</Text>
-      </View>
+        <Text style={styles.locationText}>{profile?.city || profile?.city || 'Not Specified'}</Text>
+      </View> */}
 
-      <View style={styles.locationRow}>
-        <Mail size={RFValue(9)} color={Colors.textSecondary} />
-        <Text style={styles.locationText}>{user.email}</Text>
-      </View>
+        <View style={styles.locationRow}>
+          <Mail size={RFValue(9)} color={Colors.textSecondary} />
+          <Text style={styles.locationText}>{user?.email || 'Not Specified'}</Text>
+        </View>
 
-      <View style={styles.locationRow}>
-        <Phone size={RFValue(9)} color={Colors.textSecondary} />
-        <Text style={styles.locationText}>{user.phone}</Text>
-      </View>
+        <View style={styles.locationRow}>
+          <Phone size={RFValue(9)} color={Colors.textSecondary} />
+          <Text style={styles.locationText}>{user?.phone || 'Not Specified'}</Text>
+        </View>
 
-      {/* <View style={styles.openToWorkBadge}>
+        {profile?.portfolio ? (
+          <TouchableOpacity
+            style={styles.locationRow}
+            activeOpacity={0.7}
+            onPress={() => {
+              let url = profile.portfolio;
+              if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+              }
+              Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+            }}
+          >
+            <Globe size={RFValue(9)} color={Colors.primary} />
+            <Text style={[styles.locationText, { color: Colors.primary, textDecorationLine: 'underline' }]}>
+              {profile.portfolio}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* <View style={styles.openToWorkBadge}>
         <View style={styles.openToWorkDot} />
         <Text style={styles.openToWorkText}>Open to Work</Text>
       </View> */}
-      {/* <TouchableOpacity style={styles.editProfileBtn} onPress={onEdit}>
-        <Edit3 size={RFValue(10)} color={Colors.white} />
-        <Text style={styles.editProfileBtnText}>Edit Profile</Text>
-      </TouchableOpacity> */}
-    </View>
 
-    <View style={styles.progressContainer}>
-      <CircularProgress value={60} />
+      </View>
+
+      <View style={styles.progressContainer}>
+        {completenessValue === 100 ? (
+          <View style={styles.completedBadgeWrap}>
+            <View style={styles.badgePulseContainer}>
+              <BadgeCheck size={RFValue(25)} color={Colors.success} fill={Colors.successLight} />
+            </View>
+            <Text style={styles.completedBadgeText}>Verified</Text>
+            <Text style={styles.completedSubText}>100% Done</Text>
+          </View>
+        ) : (
+          <CircularProgress value={completenessValue} />
+        )}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 export const StatsRow = () => (
   <View style={styles.statsRow}>
@@ -188,84 +229,82 @@ export const StatsRow = () => (
   </View>
 );
 
-export const ProfessionalDetailsCard = ({ profile, onEdit }: { profile: any; onEdit?: () => void }) => (
-  <View style={styles.card}>
-    <View style={styles.sectionHeaderCard}>
-      <View style={styles.sectionLeft}>
-        <View style={[styles.sectionIcon, { backgroundColor: Colors.primaryLight }]}>
-          <Briefcase color={Colors.primary} size={RFValue(10)} strokeWidth={2} />
+export const ProfessionalDetailsCard = ({ profile, onEdit }: { profile: any; onEdit?: () => void }) => {
+  const fields = [
+    { label: 'Current Company', value: profile?.currentCompany },
+    { label: 'Total Experience', value: profile?.totalExperience },
+    { label: 'Notice Period', value: profile?.noticePeriod },
+    { label: 'Current CTC', value: profile?.currentCTC ? (String(profile.currentCTC).toLowerCase().includes('lpa') ? profile.currentCTC : `${profile.currentCTC} LPA`) : null },
+    { label: 'Current Location', value: profile?.currentLocation },
+    { label: 'Current Role', value: profile?.jobTitle },
+  ].filter(f => f.value && String(f.value).trim() !== '' && String(f.value).toLowerCase() !== 'null' && String(f.value).toLowerCase() !== 'undefined');
+
+  const rows = [];
+  for (let i = 0; i < fields.length; i += 3) {
+    rows.push(fields.slice(i, i + 3));
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.sectionHeaderCard}>
+        <View style={styles.sectionLeft}>
+          <View style={[styles.sectionIcon, { backgroundColor: Colors.primaryLight }]}>
+            <Briefcase color={Colors.primary} size={RFValue(10)} strokeWidth={2} />
+          </View>
+          <Text style={styles.sectionTitle}>Professional Details</Text>
         </View>
-        <Text style={styles.sectionTitle}>Professional Details</Text>
+        <TouchableOpacity style={styles.cardEditBtn} onPress={onEdit}>
+          <Edit3 color={Colors.primary} size={RFValue(10)} />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.cardEditBtn} onPress={onEdit}>
-        <Edit3 color={Colors.primary} size={RFValue(10)} />
-      </TouchableOpacity>
+
+      {fields.length > 0 ? (
+        <View style={styles.profGrid}>
+          {rows.map((row, rowIndex) => (
+            <React.Fragment key={rowIndex}>
+              <View style={styles.profRow}>
+                {row.map((item, itemIndex) => (
+                  <View key={itemIndex} style={[styles.profCell, itemIndex !== 2 && styles.rightBorder]}>
+                    <View style={styles.profLabelRow}>
+                      <View style={styles.profDot} />
+                      <Text style={styles.profLabel}>{item.label}</Text>
+                    </View>
+                    <Text style={styles.profValue}>{item.value}</Text>
+                  </View>
+                ))}
+                {Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
+                  <View key={`empty-${emptyIndex}`} style={[styles.profCell, (row.length + emptyIndex) !== 2 && styles.rightBorder]} />
+                ))}
+              </View>
+              {rowIndex < rows.length - 1 && <View style={styles.profDivider} />}
+            </React.Fragment>
+          ))}
+        </View>
+      ) : (
+        <EmptyState message="You haven't added any professional details yet." onAdd={onEdit} buttonText="+ Add Details" />
+      )}
     </View>
+  );
+};
 
-    {(profile?.currentCompany || profile?.totalExperience) ? (
-      <View style={styles.profGrid}>
-        <View style={styles.profRow}>
-          <View style={[styles.profCell, styles.rightBorder]}>
-            <View style={styles.profLabelRow}>
-              <View style={styles.profDot} />
-              <Text style={styles.profLabel}>Current Company</Text>
-            </View>
-            <Text style={styles.profValue}>{profile.currentCompany}</Text>
-          </View>
-
-          <View style={styles.profCell}>
-            <View style={styles.profLabelRow}>
-              <View style={styles.profDot} />
-              <Text style={styles.profLabel}>Total Experience</Text>
-            </View>
-            <Text style={styles.profValue}>{profile.totalExperience}</Text>
-          </View>
-          <View style={styles.profCell}>
-            <View style={styles.profLabelRow}>
-              <View style={styles.profDot} />
-              <Text style={styles.profLabel}>Notice Period</Text>
-            </View>
-            <Text style={styles.profValue}>{profile.noticePeriod}</Text>
-          </View>
-        </View>
-
-        <View style={styles.profDivider} />
-
-        <View style={styles.profRow}>
-          <View style={[styles.profCell, styles.rightBorder]}>
-            <View style={styles.profLabelRow}>
-              <View style={styles.profDot} />
-              <Text style={styles.profLabel}>Current CTC</Text>
-            </View>
-            <Text style={styles.profValue}>{profile.currentCTC}</Text>
-          </View>
-          <View style={[styles.profCell, styles.rightBorder]}>
-            <View style={styles.profLabelRow}>
-              <View style={styles.profDot} />
-              <Text style={styles.profLabel}>Current Location</Text>
-            </View>
-            <Text style={styles.profValue}>{profile.currentLocation}</Text>
-          </View>
-          <View style={[styles.profCell, styles.rightBorder]}>
-            <View style={styles.profLabelRow}>
-              <View style={styles.profDot} />
-              <Text style={styles.profLabel}>Current Role</Text>
-            </View>
-            <Text style={styles.profValue}>{profile.jobTitle}</Text>
-          </View>
-        </View>
-
-        <View style={styles.profDivider} />
-      </View>
-    ) : (
-      <EmptyState message="You haven't added any professional details yet." onAdd={onEdit} buttonText="+ Add Details" />
-    )}
-  </View>
-);
-
-export const ResumeCard = () => {
+export const ResumeCard = ({ profile, onEdit, user }: { profile: any; onEdit?: () => void; user?: any }) => {
   const [modalVisible, setModalVisible] = React.useState(false);
-  const pdfSource = { uri: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', cache: true };
+  const hasResume = !!profile?.resume;
+
+  // Handle relative vs absolute URL
+  const resumeUrl = hasResume
+    ? (profile.resume.startsWith('http') ? profile.resume : `https://admin.jobonn.in/storage/${profile.resume}`)
+    : '';
+
+  const pdfSource = { uri: resumeUrl, cache: true };
+
+  const getDisplayFilename = () => {
+    if (!hasResume) return '';
+    const displayName = user?.name ? user.name.trim().replace(/\s+/g, ' ') : 'user';
+    return `${displayName} Resume.pdf`;
+  };
+
+  const filename = getDisplayFilename();
 
   return (
     <>
@@ -279,42 +318,54 @@ export const ResumeCard = () => {
           </View>
         </View>
 
-        <View style={styles.resumeBox}>
-          <View style={styles.resumeIconWrap}>
-            <View style={styles.pdfIcon}>
-              <Text style={styles.pdfIconText}>PDF</Text>
+        {hasResume ? (
+          <View style={styles.resumeBox}>
+            <View style={styles.resumeIconWrap}>
+              <View style={styles.pdfIcon}>
+                <Text style={styles.pdfIconText}>PDF</Text>
+              </View>
             </View>
+            <View style={styles.resumeDetailsWrap}>
+              <Text style={styles.resumeName} numberOfLines={1}>{filename}</Text>
+              <Text style={styles.resumeDate}>Uploaded Resume</Text>
+            </View>
+            <TouchableOpacity style={styles.resumePreviewBtn} onPress={() => setModalVisible(true)}>
+              <Eye size={RFValue(9)} color={Colors.textSecondary} />
+              <Text style={styles.resumePreviewText}>Preview</Text>
+            </TouchableOpacity>
+            {onEdit && (
+              <TouchableOpacity style={styles.resumeUpdateBtn} onPress={onEdit}>
+                <UploadCloud size={RFValue(9)} color={Colors.white} />
+                <Text style={styles.resumeUpdateText}>Update</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={styles.resumeDetailsWrap}>
-            <Text style={styles.resumeName}>Aman_Sharma_Resume.pdf</Text>
-            <Text style={styles.resumeDate}>Updated 2 days ago • 245 KB</Text>
-          </View>
-          <TouchableOpacity style={styles.resumePreviewBtn} onPress={() => setModalVisible(true)}>
-            <Eye size={RFValue(9)} color={Colors.textSecondary} />
-            <Text style={styles.resumePreviewText}>Preview</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.resumeUpdateBtn}>
-            <UploadCloud size={RFValue(9)} color={Colors.white} />
-            <Text style={styles.resumeUpdateText}>Update</Text>
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <EmptyState
+            message="You haven't uploaded a resume yet."
+            onAdd={onEdit}
+            buttonText="+ Upload Resume"
+          />
+        )}
       </View>
 
-      <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: wp('4%'), borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <ChevronLeft size={RFValue(15)} color={Colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={{ fontSize: RFValue(12), fontWeight: '700', marginLeft: wp('2%'), color: Colors.textPrimary }}>Resume Preview</Text>
-          </View>
-          <Pdf
-            source={pdfSource}
-            style={{ flex: 1, width: wp('100%'), height: hp('100%') }}
-            trustAllCerts={false}
-          />
-        </SafeAreaView>
-      </Modal>
+      {hasResume && (
+        <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: Colors.white }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: wp('4%'), borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <ChevronLeft size={RFValue(15)} color={Colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: RFValue(12), fontWeight: '700', marginLeft: wp('2%'), color: Colors.textPrimary }}>Resume Preview</Text>
+            </View>
+            <Pdf
+              source={pdfSource}
+              style={{ flex: 1, width: wp('100%'), height: hp('100%') }}
+              trustAllCerts={false}
+            />
+          </SafeAreaView>
+        </Modal>
+      )}
     </>
   );
 };
@@ -361,13 +412,13 @@ export const ExperienceCard = ({ profile, onEdit }: { profile: any; onEdit?: () 
       </TouchableOpacity>
     </View>
 
-    {(profile?.work_experience && profile.work_experience.length > 0) ? (
+    {(profile?.experiences && profile.experiences.length > 0) ? (
       <View>
-        {profile.work_experience.map((exp: any, index: number) => (
+        {profile.experiences.map((exp: any, index: number) => (
           <View key={index} style={styles.timelineItem}>
             <View style={styles.timelineDotWrap}>
               <View style={[styles.timelineDot, { backgroundColor: Colors.primary }]} />
-              {index < profile.work_experience.length - 1 && <View style={styles.timelineLine} />}
+              {index < profile.experiences.length - 1 && <View style={styles.timelineLine} />}
             </View>
             <View style={styles.timelineContent}>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -389,7 +440,7 @@ export const ExperienceCard = ({ profile, onEdit }: { profile: any; onEdit?: () 
 
                 <View style={{ alignItems: 'flex-end', maxWidth: wp('35%') }}>
                   <Text style={styles.expCompany} numberOfLines={1}>{exp.company}</Text>
-                    <Text style={styles.expDateText}>{exp.location}</Text>
+                  <Text style={styles.expDateText}>{exp.location}</Text>
                 </View>
               </View>
             </View>
@@ -432,13 +483,18 @@ export const EducationCard = ({ profile, onEdit }: { profile: any; onEdit?: () =
                   </View>
                   <View style={styles.expDateRow}>
                     <Calendar size={RFValue(7)} color={Colors.textTertiary} />
-                    <Text style={styles.expDateText}>{edu.startDate} – {edu.endDate} {edu.gpa ? ` (CGPA ${edu.gpa})` : ''}</Text>
+                    <Text style={styles.expDateText}>
+                      {edu.startDate && edu.endDate && edu.startDate !== edu.endDate
+                        ? `${edu.startDate} – ${edu.endDate}`
+                        : (edu.endDate || edu.startDate || '')}
+                      {edu.gpa ? ` (${edu.gpa.toLowerCase().includes('cgpa') || edu.gpa.includes('%') ? edu.gpa : `CGPA ${edu.gpa}`})` : ''}
+                    </Text>
                   </View>
                 </View>
 
                 <View style={{ alignItems: 'flex-end', maxWidth: wp('40%') }}>
                   <Text style={styles.expCompany} numberOfLines={1}>{edu.school}</Text>
- <Text style={styles.expDateText}>{edu.location}</Text>
+                  <Text style={styles.expDateText}>{edu.location}</Text>
                 </View>
               </View>
             </View>
@@ -653,7 +709,31 @@ const styles = StyleSheet.create({
   openToWorkBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.successLight, alignSelf: 'flex-start', paddingHorizontal: wp('1.5%'), paddingVertical: hp('0.2%'), borderRadius: wp('1%') },
   openToWorkDot: { width: wp('1.2%'), height: wp('1.2%'), borderRadius: wp('0.6%'), backgroundColor: Colors.success, marginRight: wp('1%') },
   openToWorkText: { fontSize: RFValue(7.5), color: Colors.success, fontWeight: '600' },
-  progressContainer: { alignItems: 'center' },
+  progressContainer: { alignItems: 'center', justifyContent: 'center' },
+  completedBadgeWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: wp('1%'),
+  },
+  badgePulseContainer: {
+    backgroundColor: Colors.successLight,
+    padding: wp('1.5%'),
+    borderRadius: wp('6%'),
+    borderWidth: 1,
+    borderColor: Colors.success + '20',
+  },
+  completedBadgeText: {
+    fontSize: RFValue(8),
+    fontWeight: '800',
+    color: Colors.success,
+    marginTop: hp('0.5%'),
+    textAlign: 'center',
+  },
+  completedSubText: {
+    fontSize: RFValue(7.5),
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
 
   editProfileBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: hp('1%'), borderRadius: wp('2.5%'), marginTop: hp('1%'), gap: wp('1.5%'), maxWidth: wp('40%') },
   editProfileBtnText: { fontSize: RFValue(10), fontWeight: '700', color: Colors.white },
@@ -732,8 +812,8 @@ const styles = StyleSheet.create({
   careerGridRow: { flexDirection: 'row', justifyContent: 'space-between' },
   careerGridCell: { flex: 1 },
   detailsGridLabel: { fontSize: RFValue(7.5), color: Colors.textSecondary, fontWeight: '500', marginBottom: hp('0.2%') },
-  detailsGridVal: { fontSize: RFValue(8.5), color: Colors.textPrimary, fontWeight: '700' },
-  languageContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: wp('2%') },
+  detailsGridVal: { fontSize: RFValue(8), color: Colors.textPrimary, fontWeight: '700', maxWidth: wp('30%'), marginRight: wp('2%'), textAlign: 'justify' },
+  languageContainer: { flexDirection: 'row', flexWrap: 'wrap' },
   detailsGridRow: { flexDirection: 'row' },
   detailsGridCell: { flex: 1 },
   iconLabelRow: { flexDirection: 'row', alignItems: 'center', gap: wp('1.5%'), marginBottom: hp('0.2%') },

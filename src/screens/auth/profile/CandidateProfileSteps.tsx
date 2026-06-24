@@ -1,9 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { useForm, Controller } from 'react-hook-form';
-import * as yup from 'yup';
-import { yupResolver } from '@hookform/resolvers/yup';
 import CustomInput from '../../../components/inputs/CustomInput';
 import CustomButton from '../../../components/buttons/CustomButton';
 import DropdownInput from '../../../components/forms/DropdownInput';
@@ -16,6 +13,17 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Edit2, Trash2, Plus } from 'lucide-react-native';
 import LanguageProficiencyModal, { LanguageData } from '../../../components/forms/LanguageProficiencyModal';
+import { useDispatch } from 'react-redux';
+import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  savePersonalDetailsSlice,
+  saveProfessionalInfoSlice,
+  saveCareerPreferencesSlice,
+  saveEducationSlice,
+  saveDocumentsSlice,
+} from '../../../redux/CandidateProfileSlice';
+import { parseDOB, parseYear } from '../../../utils/candidateProfileUtils';
 
 interface CandidateProfileStepsProps {
   currentStep: number;
@@ -25,76 +33,51 @@ interface CandidateProfileStepsProps {
   onSkipStep: (stepIndex: number) => void;
   saving: boolean;
   totalSteps: number;
+  initialData?: any;
 }
 
-// Validation Schemas per step
-const step1Schema = yup.object().shape({
-  dob: yup.date().required('Date of Birth is required').nullable(),
-  gender: yup.string().required('Gender is required'),
-  maritalStatus: yup.string().required('Marital Status is required'),
-  languages: yup.array().of(
-    yup.object().shape({
-      language: yup.string().required(),
-      proficiency: yup.string().required(),
-      comfortableIn: yup.array().of(yup.string()).min(1),
-    })
-  ).min(1, 'Add at least one language'),
-  city: yup.string().required('City is required'),
-  state: yup.string().required('State is required'),
-});
+const formatDate = (date: any) => {
+  if (!date) return '';
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
 
-const step2Schema = yup.object().shape({
-  summary: yup.string().required('Profile summary is required'),
-  jobTitle: yup.string().required('Job Title is required'),
-  experienceLevel: yup.string().required('Experience Level is required'),
-  experienceYears: yup.string().when('experienceLevel', {
-    is: (val: string) => val && val !== 'Fresher',
-    then: (schema) => schema.required('Years is required'),
-    otherwise: (schema) => schema.nullable(),
-  }),
-  experienceMonths: yup.string().when('experienceLevel', {
-    is: (val: string) => val && val !== 'Fresher',
-    then: (schema) => schema.required('Months is required'),
-    otherwise: (schema) => schema.nullable(),
-  }),
-  currentCompany: yup.string().when('experienceLevel', {
-    is: (val: string) => val && val !== 'Fresher',
-    then: (schema) => schema.required('Current Company is required'),
-    otherwise: (schema) => schema.nullable(),
-  }),
-  currentLocation: yup.string().when('experienceLevel', {
-    is: (val: string) => val && val !== 'Fresher',
-    then: (schema) => schema.required('Current Location is required'),
-    otherwise: (schema) => schema.nullable(),
-  }),
-  currentCTC: yup.string().when('experienceLevel', {
-    is: (val: string) => val && val !== 'Fresher',
-    then: (schema) => schema.required('Current CTC is required'),
-    otherwise: (schema) => schema.nullable(),
-  }),
-});
+const formatDateToDDMMYYYY = (date: any) => {
+  if (!date) return '';
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return '';
+  }
+};
 
-const step3Schema = yup.object().shape({
-  skills: yup.array().of(yup.string()).min(1, 'At least one skill required'),
-  jobType: yup.array().of(yup.string()).min(1, 'Select at least one job type'),
-  expectedSalary: yup.string().required('Expected Salary is required'),
-  preferredLocation: yup.string().required('Preferred Location is required'),
-  preferredShift: yup.string().required('Preferred Shift is required'),
-  noticePeriod: yup.string().required('Notice Period is required'),
-});
+const mapComfortSkill = (skill: string) => {
+  if (skill === 'Reading') return 'Read';
+  if (skill === 'Writing') return 'Write';
+  if (skill === 'Speaking') return 'Speak';
+  return skill;
+};
 
-const step4Schema = yup.object().shape({
-  qualification: yup.string().required('Highest Qualification is required'),
-  college: yup.string().required('College Name is required'),
-  passingYear: yup.date().required('Passing Year is required').nullable(),
-  percentage: yup.string().required('Percentage/CGPA is required'),
-});
-
-const step5Schema = yup.object().shape({
-  profileImage: yup.mixed().nullable(),
-  resume: yup.mixed().nullable().required('Resume is required'),
-  portfolio: yup.string().url('Must be a valid URL').nullable(),
-});
+const formatYear = (date: any) => {
+  if (!date) return '';
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    return String(d.getFullYear());
+  } catch {
+    return String(date);
+  }
+};
 
 const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
   currentStep,
@@ -104,83 +87,366 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
   onSkipStep,
   saving,
   totalSteps,
+  initialData,
 }) => {
+  const dispatch = useDispatch();
   const [isLangModalVisible, setIsLangModalVisible] = useState(false);
   const [editingLangIndex, setEditingLangIndex] = useState<number | null>(null);
+  const [candidateId, setCandidateId] = useState<number | null>(null);
 
-  const getSchemaForStep = (step: number) => {
-    switch (step) {
-      case 0: return step1Schema;
-      case 1: return step2Schema;
-      case 2: return step3Schema;
-      case 3: return step4Schema;
-      case 4: return step5Schema;
-      default: return yup.object().shape({});
+  const prefillForm = (userObj: any) => {
+    if (!userObj) return;
+    console.log('[CandidateProfileSteps] Prefilling form with:', userObj);
+    const cand = userObj.candidate || userObj || {};
+    const personal = cand.personal_detail || {};
+    const professional = cand.professional_detail || {};
+    const career = cand.career_preference || {};
+    const educationsList = cand.educations || cand.education || [];
+    const firstEdu = educationsList[0] || {};
+    const skillsList = cand.skills || [];
+    const docsObj = cand.docs || {};
+
+    const parseComfortableIn = (comfortableIn: any): string[] => {
+      if (!comfortableIn) return [];
+      const str = Array.isArray(comfortableIn) ? comfortableIn.join(', ') : String(comfortableIn);
+      const result: string[] = [];
+      if (str.toLowerCase().includes('read')) result.push('Reading');
+      if (str.toLowerCase().includes('write')) result.push('Writing');
+      if (str.toLowerCase().includes('speak')) result.push('Speaking');
+      return result;
+    };
+
+    setFormData((prev: any) => ({
+      ...prev,
+      dob: personal.dob ? parseDOB(personal.dob) : prev.dob,
+      gender: personal.gender || prev.gender,
+      maritalStatus: personal.marital_status || prev.maritalStatus,
+      languages: (cand.languages && cand.languages.length > 0)
+        ? cand.languages.map((l: any) => {
+          if (typeof l === 'string') {
+            return {
+              language: l,
+              proficiency: '',
+              comfortableIn: [],
+            };
+          }
+          return {
+            language: l.language_name || l.language || l.name || '',
+            proficiency: l.proficiency || '',
+            comfortableIn: parseComfortableIn(l.comfortable_in),
+          };
+        })
+        : prev.languages,
+      city: personal.city || prev.city,
+      state: personal.state || prev.state,
+      summary: professional.profile_summery || prev.summary,
+      jobTitle: professional.job_title || cand.designation || prev.jobTitle,
+      experienceLevel: professional.experience_level || prev.experienceLevel,
+      experienceYears: professional.exp_years !== undefined && professional.exp_years !== null && professional.exp_years !== 'null' ? String(professional.exp_years) : prev.experienceYears,
+      experienceMonths: professional.exp_months !== undefined && professional.exp_months !== null && professional.exp_months !== 'null' ? String(professional.exp_months) : prev.experienceMonths,
+      currentCompany: professional.current_company || prev.currentCompany,
+      currentLocation: professional.current_location !== 'null' ? (professional.current_location || prev.currentLocation) : prev.currentLocation,
+      currentCTC: professional.ctc !== undefined && professional.ctc !== null && professional.ctc !== 'null' ? String(professional.ctc) : prev.currentCTC,
+      skills: (skillsList && skillsList.length > 0)
+        ? skillsList.map((s: any) => typeof s === 'string' ? s : (s.skill || s.skill_name || ''))
+        : prev.skills,
+      noticePeriod: career.notice_period || prev.noticePeriod,
+      jobType: (career.preferred_job_types && (Array.isArray(career.preferred_job_types) || typeof career.preferred_job_types === 'string'))
+        ? (Array.isArray(career.preferred_job_types)
+          ? career.preferred_job_types
+          : (typeof career.preferred_job_types === 'string' && career.preferred_job_types.trim()
+            ? career.preferred_job_types.split(',').map((s: string) => s.trim())
+            : []))
+        : prev.jobType,
+      expectedSalary: career.expected_salary !== undefined && career.expected_salary !== null && career.expected_salary !== 'null' ? String(career.expected_salary) : prev.expectedSalary,
+      preferredLocation: career.preferred_location || prev.preferredLocation,
+      preferredShift: career.availability || prev.preferredShift,
+      qualification: firstEdu.highest_qualification || cand.highest_qualification || prev.qualification,
+      college: firstEdu.institute_name || cand.institute_name || prev.college,
+      passingYear: (firstEdu.passing_year || cand.passing_year) ? parseYear(String(firstEdu.passing_year || cand.passing_year)) : prev.passingYear,
+      percentage: firstEdu.percentage_cgpa !== undefined && firstEdu.percentage_cgpa !== null && firstEdu.percentage_cgpa !== 'null' ? String(firstEdu.percentage_cgpa) : prev.percentage,
+      profileImage: (docsObj.profile_img || cand.profile_img || cand.profile_image) ? {
+        uri: String(docsObj.profile_img || cand.profile_img || cand.profile_image).startsWith('http')
+          ? String(docsObj.profile_img || cand.profile_img || cand.profile_image)
+          : `https://admin.jobonn.in/storage/${docsObj.profile_img || cand.profile_img || cand.profile_image}`,
+        name: 'profile_image.jpg',
+        type: 'image/jpeg',
+      } : prev.profileImage,
+      resume: (docsObj.resume || cand.resume) ? {
+        uri: String(docsObj.resume || cand.resume).startsWith('http')
+          ? String(docsObj.resume || cand.resume)
+          : `https://admin.jobonn.in/storage/${docsObj.resume || cand.resume}`,
+        name: 'resume.pdf',
+        type: 'application/pdf',
+      } : prev.resume,
+      portfolio: docsObj.portfolio_link || cand.portfolio || prev.portfolio,
+    }));
+  };
+
+  useEffect(() => {
+    if (initialData) {
+      prefillForm(initialData);
+      const candId = initialData.candidate?.id || initialData.candidate_id || initialData.id;
+      if (candId) {
+        setCandidateId(Number(candId));
+      }
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    const fetchCandidateIdAndUserData = async () => {
+      try {
+        const data = await AsyncStorage.getItem('userData');
+        if (data) {
+          const parsed = JSON.parse(data);
+          const candId = parsed.candidate?.id || parsed.candidate_id || parsed.id;
+          if (candId) {
+            setCandidateId(Number(candId));
+            console.log('[CandidateProfileSteps] Loaded candidate_id:', candId);
+          }
+          if (!initialData) {
+            prefillForm(parsed);
+          }
+        }
+      } catch (error) {
+        console.error('[CandidateProfileSteps] Error loading candidate_id/userData:', error);
+      }
+    };
+    fetchCandidateIdAndUserData();
+  }, [initialData]);
+
+  // Form State
+  const [formData, setFormData] = useState<any>({
+    dob: null,
+    gender: '',
+    maritalStatus: '',
+    languages: [],
+    city: '',
+    state: '',
+    summary: '',
+    jobTitle: '',
+    experienceLevel: '',
+    experienceYears: '',
+    experienceMonths: '',
+    currentCompany: '',
+    currentLocation: '',
+    currentCTC: '',
+    skills: [],
+    noticePeriod: '',
+    jobType: [],
+    expectedSalary: '',
+    preferredLocation: '',
+    preferredShift: '',
+    qualification: '',
+    college: '',
+    passingYear: null,
+    percentage: '',
+    profileImage: null,
+    resume: null,
+    portfolio: '',
+  });
+
+  const [errors, setErrors] = useState<any>({});
+  const [localSaving, setLocalSaving] = useState(false);
+
+  const updateField = (key: string, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [key]: value }));
+    if (errors[key]) {
+      setErrors((prev: any) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
     }
   };
 
-  const { control, handleSubmit, formState: { errors }, watch, trigger } = useForm({
-    resolver: yupResolver(getSchemaForStep(currentStep) as any),
-    defaultValues: {
-      dob: null, gender: '', city: '', state: '', maritalStatus: '', languages: [],
-      summary: '', jobTitle: '', experienceLevel: '', experienceYears: '', experienceMonths: '',
-      currentCompany: '', currentLocation: '', currentCTC: '',
-      skills: [], noticePeriod: '', jobType: [], expectedSalary: '', preferredLocation: '', preferredShift: '',
-      qualification: '', college: '', passingYear: null, percentage: '',
-      profileImage: null, resume: null, portfolio: '',
+  const validateStep = () => {
+    const newErrors: any = {};
+    if (currentStep === 0) {
+      if (!formData.dob) newErrors.dob = 'Date of Birth is required';
+      if (!formData.gender) newErrors.gender = 'Gender is required';
+      if (!formData.maritalStatus) newErrors.maritalStatus = 'Marital Status is required';
+      if (formData.languages.length === 0) newErrors.languages = 'Add at least one language';
+      if (!formData.city) newErrors.city = 'City is required';
+      if (!formData.state) newErrors.state = 'State is required';
+    } else if (currentStep === 1) {
+      if (!formData.summary) newErrors.summary = 'Profile summary is required';
+      if (!formData.jobTitle) newErrors.jobTitle = 'Job Title is required';
+      if (!formData.experienceLevel) newErrors.experienceLevel = 'Experience Level is required';
+      if (formData.experienceLevel && formData.experienceLevel !== 'Fresher') {
+        if (!formData.experienceYears) newErrors.experienceYears = 'Years is required';
+        if (!formData.experienceMonths) newErrors.experienceMonths = 'Months is required';
+        if (!formData.currentCompany) newErrors.currentCompany = 'Current Company is required';
+        if (!formData.currentLocation) newErrors.currentLocation = 'Current Location is required';
+        if (!formData.currentCTC) newErrors.currentCTC = 'Current CTC is required';
+      }
+    } else if (currentStep === 2) {
+      if (formData.skills.length === 0) newErrors.skills = 'At least one skill required';
+      if (formData.jobType.length === 0) newErrors.jobType = 'Select at least one job type';
+      if (!formData.expectedSalary) newErrors.expectedSalary = 'Expected Salary is required';
+      if (!formData.preferredLocation) newErrors.preferredLocation = 'Preferred Location is required';
+      if (!formData.preferredShift) newErrors.preferredShift = 'Preferred Shift is required';
+      if (!formData.noticePeriod) newErrors.noticePeriod = 'Notice Period is required';
+    } else if (currentStep === 3) {
+      if (!formData.qualification) newErrors.qualification = 'Highest Qualification is required';
+      if (!formData.college) newErrors.college = 'College Name is required';
+      if (!formData.passingYear) newErrors.passingYear = 'Passing Year is required';
+      if (!formData.percentage) newErrors.percentage = 'Percentage/CGPA is required';
+    } else if (currentStep === 4) {
+      if (!formData.resume) newErrors.resume = 'Resume is required';
+      if (formData.portfolio) {
+        const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/;
+        if (!urlRegex.test(formData.portfolio)) {
+          newErrors.portfolio = 'Must be a valid URL';
+        }
+      }
     }
-  });
 
-  const handleNext = async (data: any) => {
-    const isValid = await trigger();
-    if (isValid) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-      // Build step-specific payload for API
-      const stepPayload = buildStepPayload(currentStep, data);
-      onStepSave(stepPayload, currentStep);
+  const buildStepPayload = (step: number) => {
+    const candidateIdStr = candidateId ? String(candidateId) : '';
+    switch (step) {
+      case 0:
+        return {
+          candidate_id: candidateIdStr,
+          dob: formatDateToDDMMYYYY(formData.dob),
+          gender: formData.gender,
+          marital_status: formData.maritalStatus,
+          city: formData.city,
+          state: formData.state,
+          languages: (formData.languages || []).map((lang: any) => ({
+            language_name: lang.language,
+            proficiency: lang.proficiency,
+            comfortable_in: (lang.comfortableIn || []).map(mapComfortSkill).join(', '),
+          })),
+        };
+      case 1: {
+        const isFresher = formData.experienceLevel === 'Fresher';
+        return {
+          candidate_id: candidateIdStr,
+          profile_summery: formData.summary,
+          job_title: formData.jobTitle,
+          experience_level: formData.experienceLevel,
+          exp_years: isFresher ? 0 : (parseInt(formData.experienceYears, 10) || 0),
+          exp_months: isFresher ? 0 : (parseInt(formData.experienceMonths, 10) || 0),
+          current_company: isFresher ? null : (formData.currentCompany || null),
+          current_location: isFresher ? null : (formData.currentLocation || null),
+          ctc: isFresher ? null : (parseFloat(formData.currentCTC) || null),
+        };
+      }
+      case 2:
+        return {
+          candidate_id: candidateIdStr,
+          preferred_location: formData.preferredLocation,
+          expected_salary: formData.expectedSalary,
+          availability: formData.preferredShift,
+          preferred_job_types: formData.jobType,
+          notice_period: formData.noticePeriod,
+          skills: formData.skills,
+        };
+      case 3:
+        return {
+          candidate_id: candidateIdStr,
+          highest_qualification: formData.qualification,
+          institute_name: formData.college,
+          passing_year: formatYear(formData.passingYear),
+          percentage_cgpa: formData.percentage,
+        };
+      case 4: {
+        const data = new FormData();
+        data.append('candidate_id', String(candidateId || ''));
+        data.append('portfolio_link', formData.portfolio || '');
+        if (formData.profileImage && formData.profileImage.uri && (formData.profileImage.uri.startsWith('file:') || formData.profileImage.uri.startsWith('content:') || formData.profileImage.uri.startsWith('ph:'))) {
+          data.append('profile_img', {
+            uri: formData.profileImage.uri,
+            name: formData.profileImage.name || 'profile.jpg',
+            type: formData.profileImage.type || 'image/jpeg',
+          } as any);
+        }
+        if (formData.resume && formData.resume.uri && (formData.resume.uri.startsWith('file:') || formData.resume.uri.startsWith('content:') || formData.resume.uri.startsWith('ph:'))) {
+          data.append('resume', {
+            uri: formData.resume.uri,
+            name: formData.resume.name || 'resume.pdf',
+            type: formData.resume.type || 'application/pdf',
+          } as any);
+        }
+        return data;
+      }
+      default:
+        return {};
+    }
+  };
+
+  const handleNext = async () => {
+    if (!validateStep()) return;
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+    const payload = buildStepPayload(currentStep);
+    console.log(`[CandidateProfileSteps] Step ${currentStep} Payload:`, payload);
+
+    try {
+      setLocalSaving(true);
+      console.log('currentStep', currentStep);
+
+      let action;
+      switch (currentStep) {
+        case 0:
+          action = savePersonalDetailsSlice(payload);
+          break;
+        case 1:
+          action = saveProfessionalInfoSlice(payload);
+          break;
+        case 2:
+          action = saveCareerPreferencesSlice(payload);
+          break;
+        case 3:
+          action = saveEducationSlice(payload);
+          break;
+        case 4:
+          action = saveDocumentsSlice(payload as FormData);
+          break;
+        default:
+          throw new Error('Invalid step');
+      }
+
+      console.log(`[CandidateProfileSteps] Dispatching step ${currentStep} Redux action...`);
+      const response = await dispatch(action as any).unwrap();
+      console.log(`[CandidateProfileSteps] Step ${currentStep} Redux Success:`, response);
+
+      const candObj = response?.user?.candidate || response?.candidate;
+      const userObj = response?.user || candObj?.user;
+
+      if (userObj) {
+        const userData = {
+          ...userObj,
+          candidate: candObj,
+          profile_completed: currentStep === 4 ? true : false,
+        };
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        console.log('[CandidateProfileSteps] Updated userData in AsyncStorage:', userData);
+      }
+
+      onStepSave(payload, currentStep);
 
       if (currentStep < totalSteps - 1) {
         onStepChange(currentStep + 1);
       } else {
         onAllComplete();
       }
-    }
-  };
-
-  const buildStepPayload = (step: number, data: any) => {
-    switch (step) {
-      case 0:
-        return {
-          dob: data.dob, gender: data.gender, maritalStatus: data.maritalStatus,
-          languages: data.languages, city: data.city, state: data.state,
-        };
-      case 1:
-        return {
-          summary: data.summary, jobTitle: data.jobTitle,
-          experienceLevel: data.experienceLevel,
-          yearsOfExperience: data.experienceLevel !== 'Fresher' ? `${data.experienceYears} Years ${data.experienceMonths} Months` : '0 Years',
-          currentCompany: data.currentCompany, currentLocation: data.currentLocation,
-          currentCTC: data.currentCTC,
-        };
-      case 2:
-        return {
-          skills: data.skills, noticePeriod: data.noticePeriod,
-          jobType: data.jobType, expectedSalary: data.expectedSalary,
-          preferredLocation: data.preferredLocation, preferredShift: data.preferredShift,
-        };
-      case 3:
-        return {
-          qualification: data.qualification, college: data.college,
-          passingYear: data.passingYear, percentage: data.percentage,
-        };
-      case 4:
-        return {
-          profileImage: data.profileImage, resume: data.resume,
-          portfolio: data.portfolio,
-        };
-      default:
-        return data;
+    } catch (error: any) {
+      console.error(`[CandidateProfileSteps] Step ${currentStep} Redux Save Failed:`, error);
+      const message = error?.message || 'Failed to save progress';
+      Toast.show({
+        type: 'error',
+        text1: 'Save Failed',
+        text2: message,
+      });
+    } finally {
+      setLocalSaving(false);
     }
   };
 
@@ -194,118 +460,170 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
 
   const renderStep1 = () => (
     <View>
-      <Controller control={control} name="dob" render={({ field: { onChange, value } }) => (
-        <DatePickerInput label="Date of Birth" placeholder="Select your date of birth" value={value as any} onChange={onChange} error={errors.dob?.message as string} />
-      )} />
-      <Controller control={control} name="gender" render={({ field: { onChange, value } }) => (
-        <DropdownInput label="Gender" placeholder="Select your gender" value={value} options={['Male', 'Female', 'Other']} onSelect={onChange} error={errors.gender?.message as string} />
-      )} />
-      <Controller control={control} name="maritalStatus" render={({ field: { onChange, value } }) => (
-        <DropdownInput label="Marital Status" placeholder="Select" value={value} options={['Single', 'Married', 'Divorced']} onSelect={onChange} error={errors.maritalStatus?.message as string} />
-      )} />
+      <DatePickerInput
+        label="Date of Birth"
+        placeholder="Select your date of birth"
+        value={formData.dob}
+        onChange={(val) => updateField('dob', val)}
+        error={errors.dob}
+      />
+      <DropdownInput
+        label="Gender"
+        placeholder="Select your gender"
+        value={formData.gender}
+        options={['Male', 'Female', 'Other']}
+        onSelect={(val) => updateField('gender', val)}
+        error={errors.gender}
+      />
+      <DropdownInput
+        label="Marital Status"
+        placeholder="Select"
+        value={formData.maritalStatus}
+        options={['Single', 'Married', 'Divorced']}
+        onSelect={(val) => updateField('maritalStatus', val)}
+        error={errors.maritalStatus}
+      />
 
       <View style={{ marginBottom: hp('2%') }}>
         <Text style={{ fontSize: RFValue(10), color: Colors.textSecondary, marginBottom: hp('1%') }}>Languages Known*</Text>
-        <Controller control={control} name="languages" render={({ field: { onChange, value } }) => {
-          const langs = (value || []) as LanguageData[];
-          return (
-            <View>
-              {langs.map((lang: LanguageData, index: number) => (
-                <View key={index} style={styles.langCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.langName}>{lang.language}</Text>
-                    <Text style={styles.langDetail}>{lang.proficiency} • {lang.comfortableIn.join(', ')}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: wp('3%') }}>
-                    <TouchableOpacity onPress={() => { setEditingLangIndex(index); setIsLangModalVisible(true); }}>
-                      <Edit2 size={RFValue(12)} color={Colors.info} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => onChange(langs.filter((_, i) => i !== index))}>
-                      <Trash2 size={RFValue(12)} color={Colors.danger} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-              <TouchableOpacity
-                style={styles.addLangBtn}
-                onPress={() => { setEditingLangIndex(null); setIsLangModalVisible(true); }}
-              >
-                <Plus size={RFValue(11)} color={Colors.textSecondary} style={{ marginRight: wp('1%') }} />
-                <Text style={styles.addLangText}>Add Language</Text>
-              </TouchableOpacity>
-              {errors.languages && <Text style={styles.errorText}>{errors.languages.message as string}</Text>}
-              <LanguageProficiencyModal
-                visible={isLangModalVisible}
-                onClose={() => { setIsLangModalVisible(false); setEditingLangIndex(null); }}
-                existingLanguages={langs.map((l) => l.language)}
-                initialData={editingLangIndex !== null ? langs[editingLangIndex] : null}
-                onSave={(data) => {
-                  if (editingLangIndex !== null) {
-                    const updated = [...langs];
-                    updated[editingLangIndex] = data;
-                    onChange(updated);
-                  } else {
-                    onChange([...langs, data]);
-                  }
-                }}
-              />
+        <View>
+          {formData.languages.map((lang: LanguageData, index: number) => (
+            <View key={index} style={styles.langCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.langName}>{lang.language}</Text>
+                <Text style={styles.langDetail}>{lang.proficiency} • {lang.comfortableIn.join(', ')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: wp('3%') }}>
+                <TouchableOpacity onPress={() => { setEditingLangIndex(index); setIsLangModalVisible(true); }}>
+                  <Edit2 size={RFValue(12)} color={Colors.info} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => updateField('languages', formData.languages.filter((_: any, i: number) => i !== index))}>
+                  <Trash2 size={RFValue(12)} color={Colors.danger} />
+                </TouchableOpacity>
+              </View>
             </View>
-          )
-        }} />
+          ))}
+          <TouchableOpacity
+            style={styles.addLangBtn}
+            onPress={() => { setEditingLangIndex(null); setIsLangModalVisible(true); }}
+          >
+            <Plus size={RFValue(11)} color={Colors.textSecondary} style={{ marginRight: wp('1%') }} />
+            <Text style={styles.addLangText}>Add Language</Text>
+          </TouchableOpacity>
+          {errors.languages && <Text style={styles.errorText}>{errors.languages}</Text>}
+          <LanguageProficiencyModal
+            visible={isLangModalVisible}
+            onClose={() => { setIsLangModalVisible(false); setEditingLangIndex(null); }}
+            existingLanguages={formData.languages.map((l: any) => l.language)}
+            initialData={editingLangIndex !== null ? formData.languages[editingLangIndex] : null}
+            onSave={(data) => {
+              if (editingLangIndex !== null) {
+                const updated = [...formData.languages];
+                updated[editingLangIndex] = data;
+                updateField('languages', updated);
+              } else {
+                updateField('languages', [...formData.languages, data]);
+              }
+            }}
+          />
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', gap: wp('4%') }}>
         <View style={{ flex: 1 }}>
-          <Controller control={control} name="city" render={({ field: { onChange, value } }) => (
-            <CustomInput label="City" placeholder="City" value={value} onChangeText={onChange} error={errors.city?.message as string} />
-          )} />
+          <CustomInput
+            label="City"
+            placeholder="City"
+            value={formData.city}
+            onChangeText={(val) => updateField('city', val)}
+            error={errors.city}
+          />
         </View>
         <View style={{ flex: 1 }}>
-          <Controller control={control} name="state" render={({ field: { onChange, value } }) => (
-            <CustomInput label="State" placeholder="State" value={value} onChangeText={onChange} error={errors.state?.message as string} />
-          )} />
+          <CustomInput
+            label="State"
+            placeholder="State"
+            value={formData.state}
+            onChangeText={(val) => updateField('state', val)}
+            error={errors.state}
+          />
         </View>
       </View>
     </View>
   );
 
   const renderStep2 = () => {
-    const expLevel = watch('experienceLevel');
-    const isExperienced = expLevel && expLevel !== 'Fresher';
+    const isExperienced = formData.experienceLevel && formData.experienceLevel !== 'Fresher';
     return (
       <View>
-        <Controller control={control} name="summary" render={({ field: { onChange, value } }) => (
-          <CustomInput label="Profile Summary" placeholder="Brief overview of your professional background" value={value} onChangeText={onChange} error={errors.summary?.message as string} />
-        )} />
-        <Controller control={control} name="jobTitle" render={({ field: { onChange, value } }) => (
-          <CustomInput label="Job Title" placeholder="Enter your current job role" value={value} onChangeText={onChange} error={errors.jobTitle?.message as string} />
-        )} />
-        <Controller control={control} name="experienceLevel" render={({ field: { onChange, value } }) => (
-          <DropdownInput label="Experience Level" placeholder="Select experience level" value={value} options={['Fresher', 'Intermediate', 'Senior', 'Executive']} onSelect={onChange} error={errors.experienceLevel?.message as string} />
-        )} />
+        <CustomInput
+          label="Profile Summary"
+          placeholder="Brief overview of your professional background"
+          value={formData.summary}
+          onChangeText={(val) => updateField('summary', val)}
+          error={errors.summary}
+        />
+        <CustomInput
+          label="Job Title"
+          placeholder="Enter your current job role"
+          value={formData.jobTitle}
+          onChangeText={(val) => updateField('jobTitle', val)}
+          error={errors.jobTitle}
+        />
+        <DropdownInput
+          label="Experience Level"
+          placeholder="Select experience level"
+          value={formData.experienceLevel}
+          options={['Fresher', 'Intermediate', 'Senior', 'Executive']}
+          onSelect={(val) => updateField('experienceLevel', val)}
+          error={errors.experienceLevel}
+        />
         {isExperienced && (
           <Animated.View entering={FadeInDown.duration(400)}>
             <View style={{ flexDirection: 'row', gap: wp('4%') }}>
               <View style={{ flex: 1 }}>
-                <Controller control={control} name="experienceYears" render={({ field: { onChange, value } }) => (
-                  <DropdownInput label="Exp. Years" placeholder="Years" value={value} options={Array.from({ length: 31 }, (_, i) => String(i))} onSelect={onChange} error={errors.experienceYears?.message as string} />
-                )} />
+                <DropdownInput
+                  label="Exp. Years"
+                  placeholder="Years"
+                  value={formData.experienceYears}
+                  options={Array.from({ length: 31 }, (_, i) => String(i))}
+                  onSelect={(val) => updateField('experienceYears', val)}
+                  error={errors.experienceYears}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Controller control={control} name="experienceMonths" render={({ field: { onChange, value } }) => (
-                  <DropdownInput label="Exp. Months" placeholder="Months" value={value} options={Array.from({ length: 12 }, (_, i) => String(i))} onSelect={onChange} error={errors.experienceMonths?.message as string} />
-                )} />
+                <DropdownInput
+                  label="Exp. Months"
+                  placeholder="Months"
+                  value={formData.experienceMonths}
+                  options={Array.from({ length: 12 }, (_, i) => String(i))}
+                  onSelect={(val) => updateField('experienceMonths', val)}
+                  error={errors.experienceMonths}
+                />
               </View>
             </View>
-            <Controller control={control} name="currentCompany" render={({ field: { onChange, value } }) => (
-              <CustomInput label="Current Company" placeholder="Company Name" value={value} onChangeText={onChange} error={errors.currentCompany?.message as string} />
-            )} />
-            <Controller control={control} name="currentLocation" render={({ field: { onChange, value } }) => (
-              <CustomInput label="Current Location" placeholder="e.g. Bangalore" value={value} onChangeText={onChange} error={errors.currentLocation?.message as string} />
-            )} />
-            <Controller control={control} name="currentCTC" render={({ field: { onChange, value } }) => (
-              <CustomInput label="Current CTC (LPA)" placeholder="e.g. 8" keyboardType="numeric" value={value} onChangeText={onChange} error={errors.currentCTC?.message as string} />
-            )} />
+            <CustomInput
+              label="Current Company"
+              placeholder="Company Name"
+              value={formData.currentCompany}
+              onChangeText={(val) => updateField('currentCompany', val)}
+              error={errors.currentCompany}
+            />
+            <CustomInput
+              label="Current Location"
+              placeholder="e.g. Bangalore"
+              value={formData.currentLocation}
+              onChangeText={(val) => updateField('currentLocation', val)}
+              error={errors.currentLocation}
+            />
+            <CustomInput
+              label="Current CTC (LPA)"
+              placeholder="e.g. 8"
+              keyboardType="numeric"
+              value={formData.currentCTC}
+              onChangeText={(val) => updateField('currentCTC', val)}
+              error={errors.currentCTC}
+            />
           </Animated.View>
         )}
       </View>
@@ -314,74 +632,124 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
 
   const renderStep3 = () => (
     <View>
-      <Controller control={control} name="skills" render={({ field: { onChange, value } }) => (
-        <MultiSelectTags
-          label="Skills" placeholder="Type skill and press enter"
-          tags={value || []}
-          onAddTag={(tag) => onChange([...(value || []), tag])}
-          onRemoveTag={(tag) => onChange((value || []).filter((t: string) => t !== tag))}
-          error={errors.skills?.message as string}
-        />
-      )} />
-      <Controller control={control} name="jobType" render={({ field: { onChange, value } }) => (
-        <MultiSelectTags
-          label="Preferred Job Types" placeholder="Select job types"
-          tags={value || []}
-          onAddTag={(tag) => onChange([...(value || []), tag])}
-          onRemoveTag={(tag) => onChange((value || []).filter((t: string) => t !== tag))}
-          error={errors.jobType?.message as string}
-          options={['Full-time', 'Part-time', 'Contract', 'Remote']}
-        />
-      )} />
-      <Controller control={control} name="preferredLocation" render={({ field: { onChange, value } }) => (
-        <CustomInput label="Preferred Location" placeholder="e.g. Remote, Bangalore, Delhi" value={value} onChangeText={onChange} error={errors.preferredLocation?.message as string} />
-      )} />
+      <MultiSelectTags
+        label="Skills"
+        placeholder="Type skill and press enter"
+        tags={formData.skills || []}
+        onAddTag={(tag) => updateField('skills', [...(formData.skills || []), tag])}
+        onRemoveTag={(tag) => updateField('skills', (formData.skills || []).filter((t: string) => t !== tag))}
+        error={errors.skills}
+      />
+      <MultiSelectTags
+        label="Preferred Job Types"
+        placeholder="Select job types"
+        tags={formData.jobType || []}
+        onAddTag={(tag) => updateField('jobType', [...(formData.jobType || []), tag])}
+        onRemoveTag={(tag) => updateField('jobType', (formData.jobType || []).filter((t: string) => t !== tag))}
+        error={errors.jobType}
+        options={['Full-time', 'Part-time', 'Contract', 'Remote']}
+      />
+      <CustomInput
+        label="Preferred Location"
+        placeholder="e.g. Remote, Bangalore, Delhi"
+        value={formData.preferredLocation}
+        onChangeText={(val) => updateField('preferredLocation', val)}
+        error={errors.preferredLocation}
+      />
       <View style={{ flexDirection: 'row', gap: wp('4%') }}>
         <View style={{ flex: 1 }}>
-          <Controller control={control} name="preferredShift" render={({ field: { onChange, value } }) => (
-            <DropdownInput label="Preferred Shift" placeholder="Select" value={value} options={['Day Shift', 'Night Shift', 'Flexible']} onSelect={onChange} error={errors.preferredShift?.message as string} />
-          )} />
+          <DropdownInput
+            label="Preferred Shift"
+            placeholder="Select"
+            value={formData.preferredShift}
+            options={['Day Shift', 'Night Shift', 'Flexible']}
+            onSelect={(val) => updateField('preferredShift', val)}
+            error={errors.preferredShift}
+          />
         </View>
         <View style={{ flex: 1 }}>
-          <Controller control={control} name="noticePeriod" render={({ field: { onChange, value } }) => (
-            <DropdownInput label="Availability" placeholder="Notice Period" value={value} options={['Immediate', '15 Days', '30 Days', '60 Days', '90 Days']} onSelect={onChange} error={errors.noticePeriod?.message as string} />
-          )} />
+          <DropdownInput
+            label="Availability"
+            placeholder="Notice Period"
+            value={formData.noticePeriod}
+            options={['Immediate', '15 Days', '30 Days', '60 Days', '90 Days']}
+            onSelect={(val) => updateField('noticePeriod', val)}
+            error={errors.noticePeriod}
+          />
         </View>
       </View>
-      <Controller control={control} name="expectedSalary" render={({ field: { onChange, value } }) => (
-        <CustomInput label="Expected Salary (LPA)" placeholder="e.g. 10" keyboardType="numeric" value={value} onChangeText={onChange} error={errors.expectedSalary?.message as string} />
-      )} />
+      <CustomInput
+        label="Expected Salary (LPA)"
+        placeholder="e.g. 10"
+        keyboardType="numeric"
+        value={formData.expectedSalary}
+        onChangeText={(val) => updateField('expectedSalary', val)}
+        error={errors.expectedSalary}
+      />
     </View>
   );
 
   const renderStep4 = () => (
     <View>
-      <Controller control={control} name="qualification" render={({ field: { onChange, value } }) => (
-        <DropdownInput label="Highest Qualification" placeholder="Select qualification" value={value} options={['B.Tech', 'M.Tech', 'B.Sc', 'BCA', 'MCA', 'Other']} onSelect={onChange} error={errors.qualification?.message as string} />
-      )} />
-      <Controller control={control} name="college" render={({ field: { onChange, value } }) => (
-        <CustomInput label="College Name" placeholder="Enter your college or university name" value={value} onChangeText={onChange} error={errors.college?.message as string} />
-      )} />
-      <Controller control={control} name="passingYear" render={({ field: { onChange, value } }) => (
-        <DatePickerInput label="Passing Year" placeholder="Select graduation year" value={value as any} onChange={onChange} error={errors.passingYear?.message as string} />
-      )} />
-      <Controller control={control} name="percentage" render={({ field: { onChange, value } }) => (
-        <CustomInput label="Percentage/CGPA" placeholder="Enter final percentage or CGPA" keyboardType="numeric" value={value} onChangeText={onChange} error={errors.percentage?.message as string} />
-      )} />
+      <DropdownInput
+        label="Highest Qualification"
+        placeholder="Select qualification"
+        value={formData.qualification}
+        options={['B.Tech', 'M.Tech', 'B.Sc', 'BCA', 'MCA', 'Other']}
+        onSelect={(val) => updateField('qualification', val)}
+        error={errors.qualification}
+      />
+      <CustomInput
+        label="College Name"
+        placeholder="Enter your college or university name"
+        value={formData.college}
+        onChangeText={(val) => updateField('college', val)}
+        error={errors.college}
+      />
+      <DatePickerInput
+        label="Passing Year"
+        placeholder="Select graduation year"
+        value={formData.passingYear}
+        onChange={(val) => updateField('passingYear', val)}
+        error={errors.passingYear}
+      />
+      <CustomInput
+        label="Percentage/CGPA"
+        placeholder="Enter final percentage or CGPA"
+        keyboardType="numeric"
+        value={formData.percentage}
+        onChangeText={(val) => updateField('percentage', val)}
+        error={errors.percentage}
+      />
     </View>
   );
 
   const renderStep5 = () => (
     <View>
-      <Controller control={control} name="profileImage" render={({ field: { onChange, value } }) => (
-        <UploadCard label="Profile Image" type="image" value={value as any} onChange={onChange} error={errors.profileImage?.message as string} placeholder="Upload your professional photo" />
-      )} />
-      <Controller control={control} name="resume" render={({ field: { onChange, value } }) => (
-        <UploadCard label="Resume (PDF/DOC)" type="document" value={value as any} onChange={onChange} error={errors.resume?.message as string} placeholder="Upload your resume" />
-      )} />
-      <Controller control={control} name="portfolio" render={({ field: { onChange, value } }) => (
-        <CustomInput label="Portfolio Link (Optional)" placeholder="https://yourportfolio.com" value={value} onChangeText={onChange} error={errors.portfolio?.message as string} autoCapitalize="none" />
-      )} />
+      <UploadCard
+        label="Profile Image"
+        type="image"
+        value={formData.profileImage}
+        onChange={(val) => updateField('profileImage', val)}
+        error={errors.profileImage}
+        placeholder="Upload your professional photo"
+      />
+      <UploadCard
+        label="Resume (PDF/DOC)"
+        type="document"
+        value={formData.resume}
+        onChange={(val) => updateField('resume', val)}
+        error={errors.resume}
+        placeholder="Upload your resume"
+      />
+      <CustomInput
+        label="Portfolio Link (Optional)"
+        placeholder="https://yourportfolio.com"
+        value={formData.portfolio}
+        onChangeText={(val) => updateField('portfolio', val)}
+        error={errors.portfolio}
+        autoCapitalize="none"
+      />
     </View>
   );
 
@@ -414,8 +782,8 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
       <View style={styles.actionRow}>
         <CustomButton
           title={isLastStep ? 'Finish Profile ✨' : 'Save & Continue'}
-          onPress={handleSubmit(handleNext)}
-          loading={saving}
+          onPress={handleNext}
+          loading={saving || localSaving}
           style={styles.nextBtn}
         />
         <TouchableOpacity style={styles.skipBtn} onPress={() => onSkipStep(currentStep)} activeOpacity={0.7}>

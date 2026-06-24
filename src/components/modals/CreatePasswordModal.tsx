@@ -31,8 +31,8 @@ const CreatePasswordModal: React.FC<CreatePasswordModalProps> = ({
   const [error, setError] = useState('');
 
   const handleSubmit = () => {
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8){
+      setError('Password must be at least 8characters');
       return;
     }
     if (password !== confirmPassword) {

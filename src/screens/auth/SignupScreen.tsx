@@ -19,10 +19,15 @@ import AppBackground from '../../components/layout/AppBackground';
 import OTPVerificationModal from '../../components/modals/OTPVerificationModal';
 import CreatePasswordModal from '../../components/modals/CreatePasswordModal';
 import { useState } from 'react';
-import { ToastAndroid } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { SendOtpSlice, VerifyOtpSlice } from '../../redux/AuthSlice';
-
+import {
+  SendOtpSlice, VerifyOtpSlice, SetPasswordSlice,
+  SendOtpCandidateSlice, VerifyOtpCandidateSlice, SetPasswordCandidateSlice
+} from '../../redux/AuthSlice';
+import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setUser, logSignUp } from '../../services/firebase/analytics';
+import { setCrashlyticsUser } from '../../services/firebase/crashlytics';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Signup'>;
@@ -42,6 +47,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [tempFormData, setTempFormData] = useState<any>(null);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [companyId, setCompanyId] = useState<string | number | null>(null);
 
   // Phase 1: User fills basic info → send OTP
   const handleComplete = async (finalData: any) => {
@@ -49,39 +55,97 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       setMainLoading(true);
       setTempFormData(finalData);
       setUserEmail(finalData.email || '');
-      
+
       const payload = { ...finalData };
       delete payload.role;
-      console.log('payload Send Otp', payload)
-      const res = await dispatch(SendOtpSlice(payload) as any).unwrap();
-      console.log('res', res)
+      console.log('payload Send Otp', payload);
+
+      const res = await (role === 'company'
+        ? dispatch(SendOtpSlice(payload) as any)
+        : dispatch(SendOtpCandidateSlice(payload) as any)
+      ).unwrap();
+
+      console.log('res', res);
       if (res?.status) {
-        ToastAndroid.show(res?.message || 'OTP sent successfully.', ToastAndroid.SHORT);
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: res?.message || 'OTP sent successfully.',
+        });
         setShowOtpModal(true);
       } else {
-        ToastAndroid.show(res?.message || 'Failed to send OTP.', ToastAndroid.LONG);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res?.message || 'Failed to send OTP.',
+        });
       }
     } catch (error: any) {
       const errorMsg = error?.message || 'Failed to send OTP';
       console.log('API Error:', error);
-      ToastAndroid.show(errorMsg, ToastAndroid.LONG);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMsg,
+      });
     } finally {
       setMainLoading(false);
     }
   };
 
   // Phase 2: Verify OTP → show password modal
-  const handleVerifyOtp = async (otp: string) => {
+  const handleVerifyOtp = async (otp: string, phone?: string) => {
     try {
       setOtpLoading(true);
-      const resOtpVerify =  await VerifyOtpSlice({ otp });
+      const payload = {
+        "phone": phone || tempFormData?.phone,
+        "otp": otp
+      };
+
+      const resOtpVerify = await (role === 'company'
+        ? dispatch(VerifyOtpSlice(payload) as any)
+        : dispatch(VerifyOtpCandidateSlice(payload) as any)
+      ).unwrap();
+
+      console.log('resOtpVerify', resOtpVerify);
+      if (resOtpVerify?.status == false) {
+        const errorMsg = resOtpVerify?.message || 'Invalid OTP';
+        setOtpError(errorMsg);
+        Toast.show({
+          type: 'error',
+          text1: 'Verification Failed',
+          text2: errorMsg,
+        });
+        return;
+      }
+
+      // Store company_id or candidate_id from successful verification
+      if (resOtpVerify?.company_id) {
+        setCompanyId(resOtpVerify.company_id);
+      } else if (resOtpVerify?.candidate_id) {
+        setCompanyId(resOtpVerify.candidate_id);
+      } else if (resOtpVerify?.id) {
+        setCompanyId(resOtpVerify.id);
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: resOtpVerify?.message || 'OTP Verified Successfully',
+      });
+
       setShowOtpModal(false);
       setOtpError('');
       setShowPasswordModal(true);
     } catch (error: any) {
       console.error('OTP Verification failed:', error?.response?.data || error);
-      const errorMsg = error?.response?.data?.message || 'Invalid OTP. Please try 1234';
+      const errorMsg = error?.message || 'Invalid OTP. Please try 1234';
       setOtpError(errorMsg);
+      Toast.show({
+        type: 'error',
+        text1: 'Verification Failed',
+        text2: errorMsg,
+      });
     } finally {
       setOtpLoading(false);
     }
@@ -92,33 +156,97 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setRegisterLoading(true);
 
-      // Build simple registration payload
-      const registerPayload: any = {
-        name: tempFormData.name || tempFormData.full_name,
-        email: tempFormData.email,
-        phone: tempFormData.phone,
-        role: tempFormData.role,
-        password: password,
-      };
+      const payload = role === 'company'
+        ? {
+          company_id: String(companyId || ""),
+          password: password,
+          password_confirmation: password,
+        }
+        : {
+          candidate_id: String(companyId || ""),
+          password: password,
+          password_confirmation: password,
+        };
 
-      // Manager has extra fields
-      if (role === 'manager' || tempFormData.role === 'company') {
-        registerPayload.w_phone = tempFormData.w_phone;
-        registerPayload.job_title = tempFormData.job_title;
+      const resSetPassword = await (role === 'company'
+        ? dispatch(SetPasswordSlice(payload) as any)
+        : dispatch(SetPasswordCandidateSlice(payload) as any)
+      ).unwrap();
+
+      console.log('resSetPassword', resSetPassword);
+
+      if (resSetPassword?.status === false) {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to Set Password',
+          text2: resSetPassword?.message || 'Failed to set password.',
+        });
+        return;
       }
 
-      // const res = await Register(registerPayload);
-      // await AsyncStorage.setItem('userToken', res.access_token);
-      // await AsyncStorage.setItem('userData', JSON.stringify(res.data));
+      if (resSetPassword?.token) {
+        await AsyncStorage.setItem('userToken', resSetPassword.token);
+      }
+      let userData: any = null;
+      if (role === 'company') {
+        const companyObj = resSetPassword.company || {};
+        const userObj = companyObj.user || resSetPassword.user || {};
+        userData = {
+          ...userObj,
+          company: companyObj,
+          role: 'company',
+          profile_completed: false,
+        };
+      } else if (role === 'candidate') {
+        const candObj = resSetPassword.candidate || {};
+        const userObj = candObj.user || resSetPassword.user || {};
+        userData = {
+          ...userObj,
+          candidate: candObj,
+          role: 'candidate',
+          profile_completed: false,
+        };
+      } else if (resSetPassword?.user) {
+        userData = {
+          ...resSetPassword.user,
+          profile_completed: false,
+        };
+      }
+
+      if (userData) {
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        const userId = String(userData.id || '');
+        if (userId) {
+          setUser(userId, {
+            email: userData.email || '',
+            role: role,
+          });
+          setCrashlyticsUser(userId, userData.email || '', userData.name || '');
+        }
+        logSignUp('email');
+      }
+
+      Toast.show({
+        type: 'success', 
+        text1: 'Password Set Successful',
+        text2: resSetPassword?.message || 'Now fill the details to complete your profile.',
+      });
 
       setShowPasswordModal(false);
-      ToastAndroid.show('Account Created Successfully!', ToastAndroid.SHORT);
-
       // Navigate to CompleteProfile instead of Home
-      navigation.replace('CompleteProfile', { role });
+      navigation.replace('CompleteProfile', {
+        ...resSetPassword,
+        role: role,
+        company_id: role === 'company' ? (companyId || resSetPassword?.company_id) : undefined,
+        candidate_id: role === 'candidate' ? (companyId || resSetPassword?.candidate_id) : undefined
+      } as any);
     } catch (error: any) {
-      console.error('Registration failed:', error?.response?.data || error);
-      ToastAndroid.show(error?.response?.data?.message || 'Registration failed', ToastAndroid.LONG);
+      console.error('Registration failed:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Registration Failed',
+        text2: error?.message || 'Registration failed',
+      });
     } finally {
       setRegisterLoading(false);
     }
@@ -161,6 +289,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
             isVisible={showOtpModal}
             onClose={() => setShowOtpModal(false)}
             email={userEmail}
+            phone={tempFormData?.phone}
             onVerify={handleVerifyOtp}
             loading={otpLoading}
             externalError={otpError}

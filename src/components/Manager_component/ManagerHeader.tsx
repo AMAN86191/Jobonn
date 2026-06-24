@@ -23,9 +23,9 @@ const ManagerHeader: React.FC<ManagerHeaderProps> = ({ onNotifPress, unreadCount
     };
     loadUser();
   }, []);
-
+  console.log('user', user)
   const name = user?.name || 'Manager';
-  const company = user?.manager_profile?.companyName || 'JobONN';
+  const company = user?.company?.company_name || 'JobONN';
   const firstName = name.split(' ')[0];
 
   return (
@@ -35,7 +35,7 @@ const ManagerHeader: React.FC<ManagerHeaderProps> = ({ onNotifPress, unreadCount
           {/* <View style={styles.avatar}>
             <Text >{name[0]?.toUpperCase()}</Text>
           </View> */}
-            <Logs size={RFValue(13)} strokeWidth={2} color={Colors.textPrimary} />
+          <Logs size={RFValue(16)} strokeWidth={2} color={Colors.textPrimary} />
         </TouchableOpacity>
         <View>
           <Text style={styles.companyText}>{company}</Text>
@@ -59,11 +59,7 @@ const styles = StyleSheet.create({
     marginBottom: hp('2%'),
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: wp('2%') },
-  avatar: {
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   companyText: { fontSize: RFValue(8), color: Colors.textPrimary, fontWeight: '500', letterSpacing: 0.3 },
   welcomeText: { fontSize: RFValue(11), fontWeight: '700', color: Colors.textPrimary },
   notifBtn: {

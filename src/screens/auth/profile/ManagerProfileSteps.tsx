@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { useForm, Controller } from 'react-hook-form';
@@ -24,6 +24,7 @@ interface ManagerProfileStepsProps {
   onSkipStep: (stepIndex: number) => void;
   saving: boolean;
   totalSteps: number;
+  initialData?: any;
 }
 
 // Validation Schemas
@@ -47,6 +48,9 @@ const step2Schema = yup.object().shape({
     date: yup.string().required(),
   })),
   verifDoc: yup.mixed().nullable().required('Verification document is required'),
+  fb_link: yup.string().nullable(),
+  insta_link: yup.string().nullable(),
+  linked_link: yup.string().nullable(),
 });
 
 const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
@@ -57,6 +61,7 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
   onSkipStep,
   saving,
   totalSteps,
+  initialData,
 }) => {
   const [isAwardModalVisible, setIsAwardModalVisible] = useState(false);
   const [editingAwardIndex, setEditingAwardIndex] = useState<number | null>(null);
@@ -70,14 +75,41 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
     }
   };
 
-  const { control, handleSubmit, formState: { errors }, trigger } = useForm({
+  const { control, handleSubmit, formState: { errors }, trigger, reset } = useForm({
     resolver: yupResolver(getSchemaForStep(currentStep) as any),
     defaultValues: {
       companyName: '', website: '', companySize: '', industry: '', bio: '', location: '',
       companyLogo: null, coverImage: null, gstNumber: '', verifDoc: null,
-      foundedDate: '', awards: [],
+      foundedDate: '', awards: [], fb_link: '', insta_link: '', linked_link: '',
     }
   });
+
+  useEffect(() => {
+    if (initialData) {
+      const company = initialData.company || initialData;
+      reset({
+        companyName: company.company_name || company.companyName || '',
+        website: company.company_web_url || company.website || '',
+        companySize: company.company_size || company.companySize || '',
+        industry: company.industry_type || company.industry || '',
+        bio: company.company_about || company.bio || '',
+        location: company.office_location || company.location || '',
+        companyLogo: company.company_logo ? { uri: company.company_logo } : null,
+        coverImage: company.cover_img ? { uri: company.cover_img } : null,
+        gstNumber: company.gst_no || company.gstNumber || '',
+        verifDoc: company.company_docs ? { uri: company.company_docs, name: 'document.pdf' } : null,
+        foundedDate: company.founded_date || company.foundedIn || '',
+        awards: (company.awards || []).map((a: any) => ({
+          title: a.award_title || a.title || '',
+          date: a.award_date || a.date || a.year || '',
+          description: a.desc || a.description || ''
+        })),
+        fb_link: company.fb_link || '',
+        insta_link: company.insta_link || '',
+        linked_link: company.linked_link || '',
+      } as any);
+    }
+  }, [initialData, reset]);
 
   const handleNext = async (data: any) => {
     const isValid = await trigger();
@@ -108,6 +140,8 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
         return {
           gstNumber: data.gstNumber, foundedDate: data.foundedDate,
           awards: data.awards, verifDoc: data.verifDoc,
+          fb_link: data.fb_link, insta_link: data.insta_link,
+          linked_link: data.linked_link,
         };
       default:
         return data;
@@ -167,8 +201,10 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
             mode="date"
             onConfirm={(selectedDate) => {
               setIsFoundedDatePickerOpen(false);
-              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-              const formattedDate = `${months[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
+              const yyyy = selectedDate.getFullYear();
+              const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+              const dd = String(selectedDate.getDate()).padStart(2, '0');
+              const formattedDate = `${yyyy}-${mm}-${dd}`;
               onChange(formattedDate);
             }}
             onCancel={() => setIsFoundedDatePickerOpen(false)}
@@ -223,6 +259,16 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
           </View>
         );
       }} />
+
+      <Controller control={control} name="fb_link" render={({ field: { onChange, value } }) => (
+        <CustomInput label="Facebook URL (Optional)" placeholder="https://facebook.com/yourcompany" value={value || ""} onChangeText={onChange} error={errors.fb_link?.message as string} autoCapitalize="none" />
+      )} />
+      <Controller control={control} name="insta_link" render={({ field: { onChange, value } }) => (
+        <CustomInput label="Instagram URL (Optional)" placeholder="https://instagram.com/yourcompany" value={value || ""} onChangeText={onChange} error={errors.insta_link?.message as string} autoCapitalize="none" />
+      )} />
+      <Controller control={control} name="linked_link" render={({ field: { onChange, value } }) => (
+        <CustomInput label="LinkedIn URL (Optional)" placeholder="https://linkedin.com/company/yourcompany" value={value || ""} onChangeText={onChange} error={errors.linked_link?.message as string} autoCapitalize="none" />
+      )} />
 
       <Controller control={control} name="verifDoc" render={({ field: { onChange, value } }) => (
         <UploadCard label="Verification Document" type="document" value={value as any} onChange={onChange} error={errors.verifDoc?.message as string} />

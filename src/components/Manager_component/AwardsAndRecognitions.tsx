@@ -39,6 +39,7 @@ interface AwardsAndRecognitionsProps {
 }
 
 const AwardsAndRecognitions: React.FC<AwardsAndRecognitionsProps> = ({ awards }) => {
+  console.log(awards);
   if (!awards || awards.length === 0) {
     return null;
   }
@@ -65,7 +66,7 @@ const AwardsAndRecognitions: React.FC<AwardsAndRecognitionsProps> = ({ awards })
             <View style={styles.timelineContent}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={styles.yearText}>{item.title || item.tittle}</Text>
-                <Text style={styles.yearText}>{item.year}</Text>
+                <Text style={styles.yearText}>{item.date}</Text>
               </View>
               <Text style={styles.descText}>{item.description}</Text>
             </View>
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
     paddingBottom: hp('2.5%'),
   },
   yearText: {
-    fontSize: RFValue(10),
+    fontSize: RFValue(9),
     fontWeight: '500',
     color: Colors.textSecondary,
     marginBottom: hp('0.5%'),

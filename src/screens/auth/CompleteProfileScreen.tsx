@@ -19,7 +19,11 @@ import ManagerProfileSteps from "./profile/ManagerProfileSteps";
 import { RFValue } from 'react-native-responsive-fontsize';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { ChevronLeft, CheckCircle, Sparkles } from 'lucide-react-native';
-import { ToastAndroid } from 'react-native';
+import { useDispatch } from 'react-redux';
+import { useRef } from 'react';
+import { CompleteRegistrationSlice } from '../../redux/AuthSlice';
+import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'CompleteProfile'>;
@@ -27,22 +31,56 @@ type Props = {
 };
 
 const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
+  const dispatch = useDispatch();
   const role = route.params?.role ?? 'candidate';
+  const company_id = route.params?.company_id ?? '';
   const [isCompleted, setIsCompleted] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [saving, setSaving] = useState(false);
-
+  const companyProfileDataRef = useRef<any>({});
   const totalSteps = role === 'candidate' ? 5 : 2;
 
+  const getInitialUser = () => {
+    if (route.params?.user) {
+      return route.params.user;
+    }
+    if (route.params?.candidate) {
+      return {
+        ...route.params.user,
+        candidate: route.params.candidate,
+      };
+    }
+    return null;
+  };
+
+  const initialUserData = getInitialUser();
+
+
+
+  console.log('role', role);
   const handleStepSave = async (stepData: any, stepIndex: number) => {
     try {
       setSaving(true);
+      if (role === 'company') {
+        companyProfileDataRef.current = { ...companyProfileDataRef.current, ...stepData };
+        console.log(`[CompleteProfile] Company Step ${stepIndex + 1} cached:`, stepData);
+
+        return;
+      }
       // await UpdateProfile(stepData);
       console.log(`[CompleteProfile] Step ${stepIndex + 1} saved:`, stepData);
-      ToastAndroid.show('Progress saved!', ToastAndroid.SHORT);
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Progress saved!',
+      });
     } catch (error: any) {
       console.error('Profile update failed:', error);
-      ToastAndroid.show('Failed to save. Please try again.', ToastAndroid.LONG);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to save. Please try again.',
+      });
     } finally {
       setSaving(false);
     }
@@ -51,10 +89,91 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleAllComplete = async () => {
     try {
       setSaving(true);
+      if (role === 'company') {
+        const data = companyProfileDataRef.current;
+        console.log('Final accumulated Company Profile data:', data);
+        const formData = new FormData();
+
+        formData.append('company_id', company_id || '');
+        formData.append('company_name', data.companyName || '');
+        formData.append('office_location', data.location || '');
+        formData.append('industry_type', data.industry || '');
+        formData.append('company_size', data.companySize || '');
+        formData.append('company_web_url', data.website || '');
+        formData.append('company_about', data.bio || '');
+        formData.append('gst_no', data.gstNumber || '');
+        formData.append('founded_date', data.foundedDate || '');
+        formData.append('fb_link', data.fb_link || '');
+        formData.append('insta_link', data.insta_link || '');
+        formData.append('linked_link', data.linked_link || '');
+
+        const awardsList = data.awards || [];
+        awardsList.forEach((award: any, index: number) => {
+          formData.append(`awards[${index}][award_title]`, award.title || '');
+          formData.append(`awards[${index}][award_date]`, award.date || '');
+          formData.append(`awards[${index}][desc]`, award.description || '');
+        });
+
+        if (data.companyLogo && data.companyLogo.uri && (data.companyLogo.uri.startsWith('file:') || data.companyLogo.uri.startsWith('content:') || data.companyLogo.uri.startsWith('ph:'))) {
+          formData.append('company_logo', {
+            uri: data.companyLogo.uri,
+            name: data.companyLogo.name || 'logo.png',
+            type: data.companyLogo.type || 'image/png'
+          } as any);
+        }
+
+        if (data.coverImage && data.coverImage.uri && (data.coverImage.uri.startsWith('file:') || data.coverImage.uri.startsWith('content:') || data.coverImage.uri.startsWith('ph:'))) {
+          formData.append('cover_img', {
+            uri: data.coverImage.uri,
+            name: data.coverImage.name || 'cover.jpg',
+            type: data.coverImage.type || 'image/jpeg'
+          } as any);
+        }
+
+        if (data.verifDoc && data.verifDoc.uri && (data.verifDoc.uri.startsWith('file:') || data.verifDoc.uri.startsWith('content:') || data.verifDoc.uri.startsWith('ph:'))) {
+          formData.append('company_docs', {
+            uri: data.verifDoc.uri,
+            name: data.verifDoc.name || 'document.pdf',
+            type: data.verifDoc.type || 'application/pdf'
+          } as any);
+        }
+
+        console.log('Submitting Company Registration payload:', formData);
+
+        const res = await dispatch(CompleteRegistrationSlice(formData) as any).unwrap();
+        console.log('Complete registration response:', res);
+
+        if (res?.token) {
+          await AsyncStorage.setItem('userToken', res.token);
+        }
+        if (res?.company) {
+          const userData = {
+            ...(res.company.user || {}),
+            company: res.company,
+            profile_completed: true,
+          };
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        }
+
+        Toast.show({
+          type: 'success',
+          text1: 'Registration Completed Successfully',
+          text2: res?.message || 'Company Profile updated successfully!',
+        });
+
+
+        return;
+      }
+
       // await UpdateProfile({ profile_completed: true });
       setIsCompleted(true);
     } catch (error: any) {
       console.error('Failed to mark profile complete:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Complete Profile',
+        text2: error?.message || 'An error occurred during submission.',
+      });
     } finally {
       setSaving(false);
     }
@@ -69,21 +188,9 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleCompleteLater = () => {
-    Alert.alert(
-      'Complete Later?',
-      'You can always complete your profile from Settings. An incomplete profile may limit your visibility.',
-      [
-        { text: 'Stay', style: 'cancel' },
-        {
-          text: 'Go to Home',
-          onPress: () => {
-            if (role === 'candidate') navigation.replace('CandidateHome');
-            else navigation.replace('ManagerHome');
-          },
-        },
-      ]
-    );
-  };
+    if (role === 'candidate') navigation.replace('CandidateHome');
+    else navigation.replace('ManagerHome');
+  }
 
   const handleGoHome = () => {
     if (role === 'candidate') navigation.replace('CandidateHome');
@@ -159,13 +266,14 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                 onPress={() => {
                   if (currentStepIndex > 0) {
                     setCurrentStepIndex(prev => prev - 1);
+                  } else {
+                    navigation.goBack();
                   }
                 }}
                 activeOpacity={0.7}
-                disabled={currentStepIndex === 0}
               >
                 <ChevronLeft
-                  color={currentStepIndex === 0 ? Colors.textPrimary : Colors.textPrimary}
+                  color={Colors.textPrimary}
                   size={wp('5%')}
                 />
               </TouchableOpacity>
@@ -178,7 +286,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Progress Section */}
             <Animated.View entering={FadeInDown.duration(300)} style={styles.progressSection}>
               <View style={styles.progressHeader}>
-                <Text style={styles.progressTitle}>Complete Your Profile</Text>
+                <Text style={styles.progressTitle}>{'Complete Your Profile'}</Text>
                 <View style={styles.progressBadge}>
                   <Text style={styles.progressBadgeText}>{progressPercent}%</Text>
                 </View>
@@ -202,6 +310,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   onSkipStep={handleSkipStep}
                   saving={saving}
                   totalSteps={totalSteps}
+                  initialData={initialUserData}
                 />
               ) : (
                 <ManagerProfileSteps
@@ -212,6 +321,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                   onSkipStep={handleSkipStep}
                   saving={saving}
                   totalSteps={totalSteps}
+
                 />
               )}
             </View>

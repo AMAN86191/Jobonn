@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { navigationRef } from '../utils/NavigationService';
 import { Colors } from '../theme/Colors';
+import { logScreen } from '../services/firebase/analytics';
 
 // Auth Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -33,10 +34,12 @@ import CandidateApplicationFullView from '../screens/manager/CandidateApplicatio
 import ManagerAllJobsScreen from '../screens/manager/ManagerAllJobsScreen';
 import ManagerInterviewsScreen from '../screens/manager/ManagerInterviewsScreen';
 import RecommendedCandidatesScreen from '../screens/manager/RecommendedCandidatesScreen';
-import ManagerEditProfileScreen from '../screens/manager/ManagerEditProfileScreen';
+
 import ManagerAnalyticsScreen from '../screens/manager/ManagerAnalyticsScreen';
 import PackageManagementScreen from '../screens/manager/PackageManagementScreen';
 import AuditLogScreen from '../screens/manager/AuditLogScreen';
+import UpdateCompanyProfileScreen from '../screens/auth/UpdateCompanyProfileScreen';
+import TermsAndConditionsScreen from '../screens/common/TermsAndConditionsScreen';
 
 // ─── Route Param List ───────────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -44,9 +47,9 @@ export type RootStackParamList = {
   SplashScreen: undefined;
   Onboarding: undefined;
   RoleSelection: { fromSignup?: boolean };
-  Login: { role?: 'candidate' | 'manager' };
-  Signup: { role: 'candidate' | 'manager' };
-  CompleteProfile: { role: 'candidate' | 'manager' };
+  Login: { role?: 'candidate' | 'company' } | undefined;
+  Signup: { role: 'candidate' | 'company' };
+  CompleteProfile: { role?: 'candidate' | 'company';[key: string]: any } | undefined;
   ForgotPassword: undefined;
   ResetPassword: undefined;
 
@@ -69,18 +72,35 @@ export type RootStackParamList = {
   ManagerAllJobs: undefined;
   ManagerInterviews: undefined;
   RecommendedCandidates: undefined;
-  ManagerEditProfile: undefined;
+  UpdateCompanyProfileScreen: { role?: 'candidate' | 'company'; company_id?: string | number; isEditMode?: boolean; profileData?: any;[key: string]: any } | undefined;
   ManagerAnalytics: undefined;
   PackageManagement: undefined;
   AuditLogs: undefined;
+  TermsAndConditions: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // ─── Main Navigator ──────────────────────────────────────────────────────────
 const Allroute = () => {
+  const routeNameRef = React.useRef<string | undefined>(undefined);
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        routeNameRef.current = navigationRef.current?.getCurrentRoute()?.name;
+      }}
+      onStateChange={async () => {
+        const previousRouteName = routeNameRef.current;
+        const currentRouteName = navigationRef.current?.getCurrentRoute()?.name;
+
+        if (previousRouteName !== currentRouteName && currentRouteName) {
+          logScreen(currentRouteName);
+        }
+        routeNameRef.current = currentRouteName;
+      }}
+    >
       <Stack.Navigator
         initialRouteName="SplashScreen"
         screenOptions={{
@@ -145,17 +165,17 @@ const Allroute = () => {
         <Stack.Screen
           name="JobDetails"
           component={JobDetailsScreen}
-       
+
         />
         <Stack.Screen
           name="ApplyJobFlow"
           component={ApplyJobFlow}
-        
+
         />
         <Stack.Screen
           name="ApplicationSuccess"
           component={ApplicationSuccessScreen}
-       
+
         />
         <Stack.Screen
           name="CandidateNotifications"
@@ -204,8 +224,8 @@ const Allroute = () => {
           component={RecommendedCandidatesScreen}
         />
         <Stack.Screen
-          name="ManagerEditProfile"
-          component={ManagerEditProfileScreen}
+          name="UpdateCompanyProfileScreen"
+          component={UpdateCompanyProfileScreen}
         />
         <Stack.Screen
           name="ManagerAnalytics"
@@ -218,6 +238,10 @@ const Allroute = () => {
         <Stack.Screen
           name="AuditLogs"
           component={AuditLogScreen}
+        />
+        <Stack.Screen
+          name="TermsAndConditions"
+          component={TermsAndConditionsScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>
