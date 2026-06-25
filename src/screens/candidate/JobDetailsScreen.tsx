@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, StatusBar, Pressable, Image, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { ChevronLeft,  MapPin, Briefcase,  IndianRupee, Send,  Clock, Building } from 'lucide-react-native';
+import { ChevronLeft, MapPin, Briefcase, IndianRupee, Send, Clock, Building } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,13 +13,31 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import { JobDetailsTabContent, AboutCompanyTabContent, BenefitsTabContent, SimilarJobsTabContent } from '../../components/Candidate_component/JobTabComponents';
 import { jobs } from '../../data/jobonnStaticData';
 import { logJobView, logCompanyProfileView } from '../../services/firebase/analytics';
+import { normalizeBackendJob } from '../../utils/jobNormalizer';
+import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const TABS = ['Job Details', 'About Company', 'Benefits', 'Similar Jobs'];
-
 const JobDetailsScreen = ({ navigation, route }: any) => {
-  const job = route?.params?.job || jobs[0];
+  const rawJob = route?.params?.job;
+  const job = useMemo(() => {
+    if (!rawJob) return jobs[0];
+    if ('workMode' in rawJob) return rawJob;
+    return normalizeBackendJob(rawJob);
+  }, [rawJob]);
+
+  const tabs = useMemo(() => {
+    const list = ['Job Details'];
+    if (job.company || job.aboutCompany) {
+      list.push('About Company');
+    }
+    if (job.benefits && job.benefits.length > 0) {
+      list.push('Benefits');
+    }
+    // list.push('Similar Jobs');
+    return list;
+  }, [job]);
+
   const [activeTab, setActiveTab] = useState('Job Details');
   const scrollViewRef = useRef<ScrollView>(null);
   const sectionLayouts = useRef<{ [key: string]: number }>({});
@@ -42,9 +60,9 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
     const headerOffset = hp('12%'); // Approximate sticky header height
 
-    let currentTab = TABS[0];
-    for (let i = TABS.length - 1; i >= 0; i--) {
-      const tabName = TABS[i];
+    let currentTab = tabs[0];
+    for (let i = tabs.length - 1; i >= 0; i--) {
+      const tabName = tabs[i];
       const tabY = sectionLayouts.current[tabName] || 0;
       // if scrolled past the section start (accounting for sticky header offset)
       if (scrollY + headerOffset >= tabY) {
@@ -109,13 +127,11 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
         scrollEventThrottle={16}
         stickyHeaderIndices={[2]}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-            <ChevronLeft color={Colors.textPrimary} size={RFValue(15)} />
-          </TouchableOpacity>
-          <Text style={{ fontSize: RFValue(14), color: Colors.textPrimary, fontWeight: 'bold' }}>Job Details</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <CommanManagerHeader
+          title="Job Details"
+          navigation={navigation}
+          onBack={() => navigation.goBack()}
+        />
         {/* Top Info Section */}
         <View style={styles.topSection}>
           <View style={styles.titleRow}>
@@ -124,52 +140,93 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
               <View style={styles.companyRow}>
                 <Building color={Colors.primary} size={RFValue(11)} />
                 <Text style={styles.companyName}>{job.company}</Text>
-                {/* <View style={styles.ratingBadge}>
-                    <Star color={Colors.warning} size={wp('3%')} fill={Colors.warning} />
-                    <Text style={styles.ratingText}>4.2</Text>
-                  </View>
-                  <Text style={styles.reviewsText}>(1.2K Reviews)</Text> */}
               </View>
             </View>
-            <Image source={job.logo} style={styles.logo} />
+            {job.logo ? <Image source={job.logo} style={styles.logo} /> : null}
           </View>
 
           <View style={styles.tagsRowContainer}>
             <View style={styles.tagsRow}>
-              <View style={styles.tagItem}>
-                <Briefcase color={Colors.textSecondary} size={RFValue(10.5)} />
-                <Text style={styles.tagText}>{job.type}</Text>
-              </View>
-              <Text style={styles.tagDivider}>|</Text>
-              <View style={styles.tagItem}>
-                <IndianRupee color={Colors.textSecondary} size={RFValue(10.5)} />
-                <Text style={styles.tagText}>{job.salary}</Text>
-              </View>
-              <Text style={styles.tagDivider}>|</Text>
-              <View style={styles.tagItem}>
-                <MapPin color={Colors.textSecondary} size={RFValue(10.5)} />
-                <Text style={styles.tagText}>{job.location}</Text>
-              </View>
+              {(() => {
+                const tags = [];
+                if (job.type) {
+                  tags.push(
+                    <View key="type" style={styles.tagItem}>
+                      <Briefcase color={Colors.textSecondary} size={RFValue(10.5)} />
+                      <Text style={styles.tagText}>{job.type}</Text>
+                    </View>
+                  );
+                }
+                if (job.salary) {
+                  tags.push(
+                    <View key="salary" style={styles.tagItem}>
+                      <IndianRupee color={Colors.textSecondary} size={RFValue(10.5)} />
+                      <Text style={styles.tagText}>{job.salary}</Text>
+                    </View>
+                  );
+                }
+                if (job.location) {
+                  tags.push(
+                    <View key="location" style={styles.tagItem}>
+                      <MapPin color={Colors.textSecondary} size={RFValue(10.5)} />
+                      <Text style={styles.tagText}>{job.location}</Text>
+                    </View>
+                  );
+                }
+
+                const joined = [];
+                for (let i = 0; i < tags.length; i++) {
+                  joined.push(tags[i]);
+                  if (i < tags.length - 1) {
+                    joined.push(<Text key={`div-${i}`} style={styles.tagDivider}>|</Text>);
+                  }
+                }
+                return joined;
+              })()}
             </View>
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Clock color={Colors.textSecondary} size={RFValue(10.5)} />
-            <Text style={styles.postedText}>Posted: {job.posted}</Text>
+          {(job.posted || job.openings || job.applicants) ? (
+            <View style={styles.statsRow}>
+              {(() => {
+                const stats = [];
+                if (job.posted) {
+                  stats.push(
+                    <View key="posted" style={styles.statItem}>
+                      <Clock color={Colors.textSecondary} size={RFValue(10.5)} />
+                      <Text style={styles.postedText}>Posted: {job.posted}</Text>
+                    </View>
+                  );
+                }
+                if (job.openings) {
+                  stats.push(
+                    <Text key="openings" style={styles.postedText}>Openings: {job.openings}</Text>
+                  );
+                }
+                if (job.applicants !== undefined && job.applicants !== null) {
+                  stats.push(
+                    <Text key="applicants" style={styles.postedText}>Applicants: {job.applicants}</Text>
+                  );
+                }
+
+                const joined = [];
+                for (let i = 0; i < stats.length; i++) {
+                  joined.push(stats[i]);
+                  if (i < stats.length - 1) {
+                    joined.push(<Text key={`dot-${i}`} style={styles.tagDivider}>•</Text>);
+                  }
+                }
+                return joined;
+              })()}
             </View>
-            <Text style={styles.tagDivider}>•</Text>
-            <Text style={styles.postedText}>Openings: {job.openings}</Text>
-            <Text style={styles.tagDivider}>•</Text>
-            <Text style={styles.postedText}>Applicants: {job.applicants}</Text>
-          </View>
+          ) : null}
         </View>
 
         {/* Tabs - Index 2 so it becomes sticky */}
         <View style={styles.stickyTabsWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsContainer} contentContainerStyle={{ paddingHorizontal: wp('4%') }}>
-            {TABS.map(renderTab)}
-          </ScrollView>
+          <View style={styles.tabsContainer}>
+            {tabs.map(renderTab)}
+          </View>
           <View style={styles.tabBorderBottom} />
         </View>
 
@@ -180,26 +237,31 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
             <JobDetailsTabContent job={job} />
           </View>
 
-          <View style={styles.sectionDivider} />
+          {(job.company || job.aboutCompany) && (
+            <>
+              <View style={styles.sectionDivider} />
+              <View style={styles.tabContent} onLayout={(e) => sectionLayouts.current['About Company'] = e.nativeEvent.layout.y}>
+                <Text style={styles.sectionTitle}>About Company</Text>
+                <AboutCompanyTabContent job={job} />
+              </View>
+            </>
+          )}
 
-          <View style={styles.tabContent} onLayout={(e) => sectionLayouts.current['About Company'] = e.nativeEvent.layout.y}>
-            <Text style={styles.sectionTitle}>About Company</Text>
-            <AboutCompanyTabContent job={job} />
-          </View>
+          {job.benefits && job.benefits.length > 0 && (
+            <>
+              <View style={styles.sectionDivider} />
+              <View style={styles.tabContent} onLayout={(e) => sectionLayouts.current.Benefits = e.nativeEvent.layout.y}>
+                {/* <Text style={styles.sectionTitle}>Benefits</Text> */}
+                <BenefitsTabContent job={job} />
+              </View>
+            </>
+          )}
 
-          <View style={styles.sectionDivider} />
-
-          <View style={styles.tabContent} onLayout={(e) => sectionLayouts.current.Benefits = e.nativeEvent.layout.y}>
-            <Text style={styles.sectionTitle}>Benefits</Text>
-            <BenefitsTabContent job={job} />
-          </View>
-
-          <View style={styles.sectionDivider} />
-
+          {/* <View style={styles.sectionDivider} />
           <View style={styles.tabContent} onLayout={(e) => sectionLayouts.current['Similar Jobs'] = e.nativeEvent.layout.y}>
             <Text style={styles.sectionTitle}>Similar Jobs</Text>
             <SimilarJobsTabContent currentJobId={job.id} />
-          </View>
+          </View> */}
         </View>
 
 
@@ -346,6 +408,8 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp('2%'),
   },
   stickyTabsWrapper: {
     backgroundColor: Colors.white,
@@ -363,8 +427,9 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   tabItem: {
+    flex: 1,
+    alignItems: 'center',
     paddingVertical: hp('1.5%'),
-    paddingHorizontal: wp('4%'),
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },

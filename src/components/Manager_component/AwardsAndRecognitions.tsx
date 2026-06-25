@@ -6,39 +6,11 @@ import { Award } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 import RAnimated, { FadeInDown } from 'react-native-reanimated';
 
-// const awardsData = [
-//   {
-//     tittle: "CFO Award",
-//     year: '2023',
-//     description: 'Our CFO, Chintan Thakkar won The Financial Express CFO Awards 2023 for Medium Enterprise - Servicing Sector category',
-//   },
-//   {
-//     tittle: "Valuable CEO",
-//     year: '2022',
-//     description: "BW Businessworld recognized our CEO & MD, Hitesh Oberoi as one of India's Top 20 Valuable CEOs",
-//   },
-//   {
-//     tittle: "Great Place to Work",
-//     year: '2023',
-//     description: 'Certified Great Place to Work by the GPTWI from December 2022 – December 2023',
-//   },
-//   {
-//     tittle: "DMA ECHO Awards",
-//     year: '2019',
-//     description: 'DMA ECHO Awards: Naukri won Bronze for the Best Integrated marketing campaign',
-//   },
-//   {
-//     tittle: "DMA ASIA ECHO Awards",
-//     year: '2018',
-//     description: 'DMA ASIA ECHO Awards: Jeevansathi Mandap won Bronze for Best Use of Experimental Marketing',
-//   },
-// ];
-
 interface AwardsAndRecognitionsProps {
   awards: any[];
 }
 
-const AwardsAndRecognitions: React.FC<AwardsAndRecognitionsProps> = ({ awards }) => {
+const AwardsAndRecognitions: React.FC<AwardsAndRecognitionsProps> = React.memo(({ awards }) => {
   console.log(awards);
   if (!awards || awards.length === 0) {
     return null;
@@ -75,7 +47,7 @@ const AwardsAndRecognitions: React.FC<AwardsAndRecognitionsProps> = ({ awards })
       </View>
     </RAnimated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   sectionCard: {

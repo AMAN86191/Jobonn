@@ -12,13 +12,14 @@ interface JobCardProps {
   location: string;
   salary: string;
   type: string;
+  posted?: string;
   isSaved?: boolean;
   onPress?: () => void;
   onSave?: () => void;
 }
 
 const JobCard: React.FC<JobCardProps> = ({
-  title, company, logo, location, salary, type, isSaved = false, onPress, onSave
+  title, company, logo, location, salary, type, posted, isSaved = false, onPress, onSave
 }) => {
   const [saved, setSaved] = useState(isSaved);
 
@@ -27,6 +28,8 @@ const JobCard: React.FC<JobCardProps> = ({
     if (onSave) onSave();
   };
 
+  const hasTags = location || salary || type;
+
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.header}>
@@ -34,11 +37,11 @@ const JobCard: React.FC<JobCardProps> = ({
           {logo ? (
             <Image source={logo} style={styles.logo} />
           ) : (
-            <Text style={styles.logoPlaceholder}>{company.charAt(0)}</Text>
+            <Text style={styles.logoPlaceholder}>{company ? company.charAt(0) : ''}</Text>
           )}
         </View>
         <View style={styles.companyBlock}>
-          <Text style={styles.company} numberOfLines={1}>{company}</Text>
+          {!!company && <Text style={styles.company} numberOfLines={1}>{company}</Text>}
           <Text style={styles.title} numberOfLines={2}>{title}</Text>
         </View>
         <Pressable onPress={handleSave} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
@@ -51,22 +54,32 @@ const JobCard: React.FC<JobCardProps> = ({
         </Pressable>
       </View>
 
-      <View style={styles.tagsRow}>
-        <View style={styles.tag}>
-          <MapPin color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} />
-          <Text style={styles.tagText}>{location}</Text>
+      {hasTags ? (
+        <View style={styles.tagsRow}>
+          {!!location && (
+            <View style={styles.tag}>
+              <MapPin color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} />
+              <Text style={styles.tagText}>{location}</Text>
+            </View>
+          )}
+          {!!salary && (
+            <View style={styles.tag}>
+              <IndianRupee color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} />
+              <Text style={styles.tagText}>{salary}</Text>
+            </View>
+          )}
+          {!!type && (
+            <View style={[styles.typeChip]}>
+              <Text style={styles.typeText}>{type}</Text>
+            </View>
+          )}
         </View>
-        <View style={styles.tag}>
-          <IndianRupee color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} />
-          <Text style={styles.tagText}>{salary}</Text>
-        </View>
-        <View style={[styles.typeChip]}>
-          <Text style={styles.typeText}>{type}</Text>
-        </View>
-      </View>
+      ) : null}
 
       <View style={styles.footer}>
-        <Text style={styles.timeText}>Posted 2 days ago</Text>
+        {posted ? (
+          <Text style={styles.timeText}>Posted {posted}</Text>
+        ) : <View />}
         <Pressable style={styles.applyBtn} onPress={onPress}>
           <Text style={styles.applyText}>Apply Now</Text>
         </Pressable>

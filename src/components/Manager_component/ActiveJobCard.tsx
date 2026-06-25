@@ -14,7 +14,7 @@ interface ActiveJobCardProps {
   applicants: number;
   shortlisted?: number;
   interviewed?: number;
-  views: string;
+  views?: string;
   status: StatusType;
   daysLeft?: number;
   onPress?: () => void;

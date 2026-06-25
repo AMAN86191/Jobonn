@@ -28,7 +28,7 @@ export const OpenPositionsCarousel: React.FC<OpenPositionsCarouselProps> = React
   onViewJobDetails,
 }) => {
   if (!positions || positions.length === 0) return null;
-
+  console.log("positions", positions);
   return (
     <RAnimated.View entering={FadeInDown.duration(400).delay(200)} style={styles.sectionCard}>
       <View style={styles.sectionHeaderRow}>

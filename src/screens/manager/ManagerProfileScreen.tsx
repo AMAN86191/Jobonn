@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,7 @@ import OpenPositionsCarousel from '../../components/Manager_component/OpenPositi
 import { getProfileCompleteness } from '../../utils/profileCompleteness';
 import { normalizeProfileData } from '../../utils/profileNormalizer';
 
-const ManagerProfileScreen = ({ navigation }: any) => {
+const ManagerProfileScreen = ({ navigation, route }: any) => {
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
 
@@ -52,43 +52,91 @@ const ManagerProfileScreen = ({ navigation }: any) => {
   });
   const [rawProfileData, setRawProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const hasDataRef = React.useRef(false);
 
-  useEffect(() => {
-    fetchProfile();
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchProfile();
-    });
-    return unsubscribe;
-  }, [navigation]);
-
-  const fetchProfile = async () => {
+  const loadCachedProfile = useCallback(async () => {
     try {
-      setLoading(true);
+      const stored = await AsyncStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const companyData = parsed.company;
+        if (companyData) {
+          setRawProfileData(companyData);
+          const normalized = normalizeProfileData(companyData);
+          setUser(normalized);
+          hasDataRef.current = true;
+          setLoading(false);
+        }
+      }
+    } catch (e) {
+      console.log('Failed to load cached profile:', e);
+    }
+  }, []);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      if (!hasDataRef.current) {
+        setLoading(true);
+      }
       const response = await dispatch(getCompanyProfileSlice() as any).unwrap();
       console.log('Company Profile response:', response);
       const rawData = response?.data || response?.company || response;
       setRawProfileData(rawData);
       const normalized = normalizeProfileData(rawData);
       setUser(normalized);
+      hasDataRef.current = true;
+
+      // Save fresh data back to AsyncStorage
+      const stored = await AsyncStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const completeness = getProfileCompleteness(rawData);
+        const newUserData = {
+          ...parsed,
+          company: rawData,
+          profile_completed: completeness.isComplete,
+        };
+        await AsyncStorage.setItem('userData', JSON.stringify(newUserData));
+      }
     } catch (error) {
       console.error('Error fetching manager profile:', error);
       ToastAndroid.show('Failed to load profile', ToastAndroid.SHORT);
-      setUser(normalizeProfileData(null));
+      if (!hasDataRef.current) {
+        setUser(normalizeProfileData(null));
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [dispatch]);
 
-  const handleEditPress = () => {
+  // Initial fetch on mount: try loading from cache first, then run API in background
+  useEffect(() => {
+    const init = async () => {
+      await loadCachedProfile();
+      fetchProfile();
+    };
+    init();
+  }, [loadCachedProfile, fetchProfile]);
+
+  // Refetch only when returned from edit profile with refresh param
+  const refreshParam = route.params?.refresh;
+  useEffect(() => {
+    if (refreshParam) {
+      fetchProfile();
+      navigation.setParams({ refresh: undefined });
+    }
+  }, [refreshParam, fetchProfile, navigation]);
+
+  const handleEditPress = useCallback(() => {
     navigation.navigate('UpdateCompanyProfileScreen', {
       role: 'company',
       company_id: user.companyid,
       isEditMode: true,
       profileData: rawProfileData
     });
-  };
+  }, [navigation, user.companyid, rawProfileData]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       setLoading(true);
       await dispatch(LogoutSlice() as any).unwrap();
@@ -103,10 +151,18 @@ const ManagerProfileScreen = ({ navigation }: any) => {
         routes: [{ name: 'Login', params: { role: 'company' } }],
       });
     }
-  };
+  }, [dispatch, navigation]);
 
-  const completeness = rawProfileData ? getProfileCompleteness(rawProfileData) : null;
-  const isProfileIncomplete = completeness ? !completeness.isComplete : true;
+  const onViewAllJobs = useCallback(() => {
+    navigation.navigate('ManagerAllJobs');
+  }, [navigation]);
+
+  const onViewJobDetails = useCallback((jobId: string) => {
+    navigation.navigate('ManagerJobDetails', { jobId });
+  }, [navigation]);
+
+  const completeness = useMemo(() => rawProfileData ? getProfileCompleteness(rawProfileData) : null, [rawProfileData]);
+  const isProfileIncomplete = useMemo(() => completeness ? !completeness.isComplete : true, [completeness]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -123,7 +179,7 @@ const ManagerProfileScreen = ({ navigation }: any) => {
         }
       />
 
-      {loading ? (
+      {loading && !user.companyid ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -193,11 +249,11 @@ const ManagerProfileScreen = ({ navigation }: any) => {
           )}
 
           {/* Open Positions horizontal carousel */}
-          <OpenPositionsCarousel
+           {/* <OpenPositionsCarousel
             positions={user.manager_profile?.openPositions}
-            onViewAllJobs={() => navigation.navigate('ManagerAllJobs')}
-            onViewJobDetails={(jobId) => navigation.navigate('ManagerJobDetails', { jobId })}
-          />
+            onViewAllJobs={onViewAllJobs}
+            onViewJobDetails={onViewJobDetails}
+          /> */}
 
           {/* Logout Button */}
           <TouchableOpacity

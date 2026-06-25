@@ -208,6 +208,24 @@ const PostJobScreen = ({ navigation }: any) => {
   const [jobTitlesData, setJobTitlesData] = useState<any>(null);
   const [locationsData, setLocationsData] = useState<any>(null);
   const [searchedSkillsList, setSearchedSkillsList] = useState<string[]>([]);
+  const [skillMap, setSkillMap] = useState<Record<string, number>>({});
+
+  const addSkillsToMap = useCallback((skillsList: any[]) => {
+    if (!Array.isArray(skillsList)) return;
+    setSkillMap(prev => {
+      const next = { ...prev };
+      skillsList.forEach((s: any) => {
+        if (s && typeof s === 'object') {
+          const name = s.skill_name || s.name;
+          const id = s.id;
+          if (name && id) {
+            next[name.toLowerCase().trim()] = id;
+          }
+        }
+      });
+      return next;
+    });
+  }, []);
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -278,6 +296,7 @@ const PostJobScreen = ({ navigation }: any) => {
           const response = await dispatch(getSkillsByJobTitleSlice(selectedJobTitleId)).unwrap();
           console.log('Fetching skills for job title ID:', response)
           const skillsList = response?.skills || [];
+          addSkillsToMap(skillsList);
           const skillNames = Array.from(
             new Set(
               skillsList
@@ -292,7 +311,7 @@ const PostJobScreen = ({ navigation }: any) => {
       };
       fetchSkills();
     }
-  }, [selectedJobTitleId, dispatch]);
+  }, [selectedJobTitleId, dispatch, addSkillsToMap]);
 
   const handleSearchSkills = useCallback(async (text: string) => {
     if (text.trim().length >= 3) {
@@ -300,6 +319,7 @@ const PostJobScreen = ({ navigation }: any) => {
         const response = await dispatch(searchSkillsSlice(text.trim())).unwrap();
         console.log('response search', response)
         const skillsList = response?.skills || response || [];
+        addSkillsToMap(skillsList);
         console.log('skillList', skillsList)
         const skillNames = skillsList?.map((s: any) => typeof s === 'string' ? s : (s.skill_name || '')) || [];
         setSearchedSkillsList(skillNames);
@@ -309,7 +329,7 @@ const PostJobScreen = ({ navigation }: any) => {
     } else {
       setSearchedSkillsList([]);
     }
-  }, [dispatch]);
+  }, [dispatch, addSkillsToMap]);
 
   useEffect(() => {
     const loadManager = async () => {
@@ -402,6 +422,10 @@ const PostJobScreen = ({ navigation }: any) => {
         return found?.id || null;
       })();
 
+      const mappedSkills = data.skills
+        .map(name => skillMap[name.toLowerCase().trim()])
+        .filter(id => id !== undefined);
+
       const payload = {
         job_title_id: selectedJobTitleId ? String(selectedJobTitleId) : "",
         job_industry_id: selectedJobIndustryId,
@@ -422,6 +446,7 @@ const PostJobScreen = ({ navigation }: any) => {
         expiry_date: formatDate(data.applicationDeadline),
         salary_type: data.salaryType,
         question: data.customQuestions,
+        skills: mappedSkills,
       };
 
       console.log('PostJob Payload:', payload);
@@ -717,6 +742,13 @@ const PostJobScreen = ({ navigation }: any) => {
                         console.log('Creating new skill:', payload);
                         const response = await dispatch(createSkillSlice(payload as any)).unwrap();
                         console.log('Skill created successfully', response);
+                        if (response?.skill) {
+                          addSkillsToMap([response.skill]);
+                        } else if (response?.id) {
+                          addSkillsToMap([response]);
+                        } else if (response?.data) {
+                          addSkillsToMap([response.data]);
+                        }
                       } catch (err) {
                         console.error('Failed to create skill', err);
                       }

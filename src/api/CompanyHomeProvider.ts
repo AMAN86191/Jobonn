@@ -25,3 +25,12 @@ export const getCompanyProfile = async () => {
     throw error.response?.data || error.message;
   }
 };
+
+export const getCompanyJobs = async (page: number = 1) => {
+  try {
+    const response = await api.get(`/company/company-jobs?page=${page}`);
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};

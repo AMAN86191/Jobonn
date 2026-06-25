@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  View, StyleSheet, StatusBar, TouchableOpacity, Text, ScrollView,
+  View, StyleSheet, StatusBar, TouchableOpacity, Text, ScrollView, ActivityIndicator,
 } from 'react-native';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, Briefcase, Calendar, AlertCircle, ChevronRight, Building2, CreditCard, FileClock, BarChart3 } from 'lucide-react-native';
+import { Users, Briefcase, Calendar, AlertCircle, ChevronRight, Building2, CreditCard, FileClock, BarChart3, ArrowLeft, ArrowRight } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Colors } from '../../theme/Colors';
@@ -21,28 +21,32 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import { recruiterProfile, jobs, talentDatabase, managedCompanies, packages, contactCredits } from '../../data/jobonnStaticData';
 import ProfileCompletenessBanner from '../../components/Manager_component/ProfileCompletenessBanner';
 
+import { useDispatch, useSelector } from 'react-redux';
+import { getCompanyJobsSlice } from '../../redux/CompanyHomeSlice';
+import { normalizeBackendJob } from '../../utils/jobNormalizer';
+
 const STATS = [
   { id: '1', title: 'Active Jobs', value: `${recruiterProfile.stats.postedJobs}`, icon: Briefcase, color: Colors.primary, subtitle: '+2 this week' },
   { id: '2', title: 'Applicants', value: `${recruiterProfile.stats.totalApplicants}`, icon: Users, color: Colors.info, subtitle: '+34 today' },
   { id: '3', title: 'Interviews', value: '18', icon: Calendar, color: Colors.success, subtitle: 'Scheduled' },
 ];
 
-// const RECENT_APPLICANTS = [
-//   { id: '1', name: 'Arjun Sharma', role: 'React Native Developer', experience: '4 yrs', location: 'Bangalore', skills: ['React Native', 'Redux', 'TypeScript'], status: 'New' as const, matchScore: 92, currentCTC: '18 LPA', expectedCTC: '22 LPA', time: '10m ago', image: require('../../../assets/images/boy.png') },
-//   { id: '2', name: 'Priya Patel', role: 'UI/UX Designer', experience: '3 yrs', location: 'Mumbai', skills: ['Figma', 'Framer', 'React'], status: 'Shortlisted' as const, matchScore: 87, currentCTC: '12 LPA', expectedCTC: '15 LPA', time: '1h ago', image: require('../../../assets/images/boy.png') },
-//   { id: '3', name: 'Rohit Kumar', role: 'Backend Developer', experience: '5 yrs', location: 'Hyderabad', skills: ['Node.js', 'AWS', 'MongoDB'], status: 'Interview' as const, currentCTC: '25 LPA', expectedCTC: '30 LPA', time: '3h ago', image: require('../../../assets/images/boy.png') },
-// ];
-
-const RECOMMENDED_CANDIDATES = talentDatabase
-  .filter(candidate => candidate.matchScore >= 85)
-  .slice(0, 2)
-  .map(candidate => ({ ...candidate, time: `${candidate.matchScore}% Match` }));
-
-const ACTIVE_JOBS = jobs.filter(job => job.status === 'Active').slice(0, 2);
 const activePackage = packages.find(item => item.active);
 
 const ManagerHomeScreen = ({ navigation }: any) => {
-  const [user, setUser] = React.useState<any>(null);
+  const dispatch = useDispatch();
+  const [user, setUser] = useState<any>(null);
+  const [page, setPage] = useState(1);
+
+  const { jobs: rawJobs, loading, lastPage } = useSelector((state: any) => state.companyHome);
+ console.log('jobs', jobs)
+  useEffect(() => {
+    dispatch(getCompanyJobsSlice(page) as any);
+  }, [dispatch, page]);
+
+  const normalizedJobs = useMemo(() => {
+    return (rawJobs || []).map((job: any) => normalizeBackendJob(job));
+  }, [rawJobs]);
 
   const loadUser = async () => {
     const data = await AsyncStorage.getItem('userData');
@@ -50,14 +54,16 @@ const ManagerHomeScreen = ({ navigation }: any) => {
     if (data) setUser(JSON.parse(data));
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadUser();
 
     const unsubscribe = navigation.addListener('focus', () => {
       loadUser();
+      dispatch(getCompanyJobsSlice(1) as any);
+      setPage(1);
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, dispatch]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -132,13 +138,54 @@ const ManagerHomeScreen = ({ navigation }: any) => {
             <Text style={styles.seeAll}>Manage →</Text>
           </TouchableOpacity>
         </View>
-        {ACTIVE_JOBS.map(job => (
-          <ActiveJobCard
-            key={job.id}
-            {...job}
-            onPress={() => navigation.navigate('ManagerJobDetails', { job })}
-          />
-        ))}
+
+        {loading && normalizedJobs.length === 0 ? (
+          <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('2%') }} />
+        ) : normalizedJobs.length === 0 ? (
+          <Text style={{ textAlign: 'center', color: Colors.textTertiary, marginVertical: hp('2%'), fontSize: RFValue(10) }}>No active jobs found</Text>
+        ) : (
+          <>
+            {normalizedJobs.map((job: any) => (
+              <ActiveJobCard
+                key={job.id}
+                title={job.title}
+                department={job.department}
+                location={job.location}
+                vacancies={job.openings}
+                applicants={job.applicants}
+                status={job.status}
+                onPress={() => navigation.navigate('ManagerJobDetails', { job })}
+              />
+            ))}
+
+            {/* Pagination Controls */}
+            {lastPage > 1 && (
+              <View style={styles.paginationRow}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
+                  disabled={page === 1}
+                  onPress={() => setPage(p => Math.max(1, p - 1))}
+                >
+                  <ArrowLeft size={RFValue(11)} color={page === 1 ? Colors.textTertiary : Colors.primary} />
+                  <Text style={[styles.pageBtnText, page === 1 && styles.pageBtnTextDisabled]}>Prev</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.pageInfoText}>
+                  Page {page} of {lastPage}
+                </Text>
+
+                <TouchableOpacity
+                  style={[styles.pageBtn, page === lastPage && styles.pageBtnDisabled]}
+                  disabled={page === lastPage}
+                  onPress={() => setPage(p => Math.min(lastPage, p + 1))}
+                >
+                  <Text style={[styles.pageBtnText, page === lastPage && styles.pageBtnTextDisabled]}>Next</Text>
+                  <ArrowRight size={RFValue(11)} color={page === lastPage ? Colors.textTertiary : Colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
 
         {/* Ad Slider */}
         <AdSlider />
@@ -160,7 +207,7 @@ const ManagerHomeScreen = ({ navigation }: any) => {
         ))} */}
 
         {/* Recommended Candidates */}
-        <View style={[styles.sectionHeader, { marginTop: hp('2%') }]}>
+        {/* <View style={[styles.sectionHeader, { marginTop: hp('2%') }]}>
           <Text style={styles.sectionTitle}>Recommended Candidates</Text>
           <TouchableOpacity onPress={() => navigation.navigate('RecommendedCandidates')}>
             <Text style={styles.seeAll}>See All →</Text>
@@ -173,7 +220,7 @@ const ManagerHomeScreen = ({ navigation }: any) => {
             avatarColor={getAvatarColor(candidate.name)}
             onPress={() => navigation.navigate('CandidateApplicationFullView', { applicant: candidate, isRecommended: true })}
           />
-        ))}
+        ))} */}
         {/* Promo Banner */}
         <View style={styles.promoBanner} >
           <View style={styles.promoContent}>
@@ -362,6 +409,44 @@ const styles = StyleSheet.create({
     fontSize: RFValue(12),
     fontWeight: '800',
     color: Colors.primary,
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: hp('1.5%'),
+    marginBottom: hp('1.5%'),
+    backgroundColor: Colors.white,
+    padding: wp('2.5%'),
+    borderRadius: wp('2.5%'),
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp('1%'),
+    paddingHorizontal: wp('3%'),
+    paddingVertical: hp('0.5%'),
+    borderRadius: wp('1.5%'),
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  pageBtnDisabled: {
+    borderColor: Colors.border,
+  },
+  pageBtnText: {
+    fontSize: RFValue(9),
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  pageBtnTextDisabled: {
+    color: Colors.textTertiary,
+  },
+  pageInfoText: {
+    fontSize: RFValue(9.5),
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
 });
 

@@ -14,11 +14,12 @@ interface AppliedJobCardProps {
   type: string;
   status: string;
   statusColor: string;
+  appliedAt?: string;
   onPress?: () => void;
 }
 
 const AppliedJobCard: React.FC<AppliedJobCardProps> = ({
-  title, company, logo, location, salary, type, status, statusColor, onPress
+  title, company, logo, location, salary, type, status, statusColor, appliedAt, onPress
 }) => {
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -56,7 +57,9 @@ const AppliedJobCard: React.FC<AppliedJobCardProps> = ({
       <View style={styles.footer}>
         <View style={styles.timeWrap}>
           <Clock color={Colors.textTertiary} size={RFValue(8.5)} />
-          <Text style={styles.timeText}>Applied 2 days ago</Text>
+          <Text style={styles.timeText}>
+            {appliedAt ? `Applied ${appliedAt}` : 'Applied recently'}
+          </Text>
         </View>
         {/* <Pressable style={styles.detailsBtn} onPress={onPress}>
           <Text style={styles.detailsText}>View Details</Text>

@@ -18,50 +18,77 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Fallbacks matching the premium image exactly
-  const displayTitle = job.title || 'Senior React Native Developer';
-  const displayDept = job.department || 'Engineering';
-  const displayLocation = job.location || 'Bangalore (Remote)';
-  const displaySalary = job.salary || '25-35 LPA';
-  const displayDescription = job.description || 'We are looking for a Senior React Native Developer to lead our mobile team.';
-  const displayExperience = job.experience || '5-8 Years';
-  const displayEducation = job.education || 'B.Tech/MCA';
-  const displayOpenings = job.vacancies || job.openings || '3';
-  const displayCategory = job.category || 'Software Development';
-  const displayJobType = job.job_type || 'Full-Time';
+  const displayTitle = job.title || '';
+  const displayDept = job.department || '';
+  const displayLocation = job.location || '';
+  const displaySalary = job.salary || '';
+  const displayDescription = job.description || '';
+  const displayExperience = job.experience || job.type || '';
+  const displayEducation = job.education || '';
+  const displayOpenings = job.openings || job.vacancies || '0';
+  const displayCategory = job.category || '';
+  const displayJobType = job.job_type || '';
 
-  const skillItems = job.skills || ['React Native', 'TypeScript', 'Redux', 'Node.js', 'AWS'];
-  const benefitItems = job.benefits || ['Health Insurance', 'Flexible Hours', 'Remote Work', 'Performance Bonus'];
+  const skillItems = React.useMemo(() => {
+    if (job.skills && Array.isArray(job.skills) && job.skills.length > 0) {
+      return job.skills;
+    }
+    const rawSkills = job.rawJob?.skills || job.rawJob?.job_skills || job.skills || [];
+    if (Array.isArray(rawSkills)) {
+      return rawSkills.map((s: any) => typeof s === 'string' ? s : (s.skill_name || s.name || '')).filter(Boolean);
+    }
+    if (typeof rawSkills === 'string') {
+      return rawSkills.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+    return [];
+  }, [job.skills, job.rawJob]);
+  const benefitItems = job.benefits || [];
 
   return (
     <>
       <RAnimated.View
         entering={FadeInDown.duration(400).delay(100)}
-        layout={Layout.springify()}
+        layout={Layout.springify()} 
         style={styles.jobCard}
       >
         {/* Header Section */}
         <View style={styles.jobHeader}>
           <View style={{ flex: 1, paddingRight: wp('2%') }}>
             <Text style={styles.jobTitle}>{displayTitle}</Text>
-            <Text style={styles.jobDept}>{displayDept} • Posted 4 days ago</Text>
+            <Text style={styles.jobDept}>
+              {displayDept}
+              {job.posted ? ` • Posted ${job.posted}` : ''}
+            </Text>
           </View>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>Active</Text>
+          <View style={[
+            styles.statusBadge,
+            job.status === 'Closed' && { backgroundColor: Colors.dangerLight }
+          ]}>
+            <Text style={[
+              styles.statusText,
+              job.status === 'Closed' && { color: Colors.danger }
+            ]}>
+              {job.status || 'Active'}
+            </Text>
           </View>
         </View>
 
         {/* Main Info Row (Location & Salary) */}
         <View style={styles.mainInfoRow}>
           <View style={styles.mainInfoLeft}>
-            <View style={styles.mainInfoItem}>
-              <MapPin size={RFValue(10)} color={Colors.textSecondary} />
-              <Text style={styles.mainInfoText}>{displayLocation}</Text>
-            </View>
-            <View style={styles.verticalDivider} />
-            <View style={styles.mainInfoItem}>
-              <IndianRupee size={RFValue(10)} color={Colors.textSecondary} />
-              <Text style={styles.mainInfoText}>{displaySalary}</Text>
-            </View>
+            {!!displayLocation && (
+              <View style={styles.mainInfoItem}>
+                <MapPin size={RFValue(10)} color={Colors.textSecondary} />
+                <Text style={styles.mainInfoText}>{displayLocation}</Text>
+              </View>
+            )}
+            {!!displayLocation && !!displaySalary && <View style={styles.verticalDivider} />}
+            {!!displaySalary && (
+              <View style={styles.mainInfoItem}>
+                <IndianRupee size={RFValue(10)} color={Colors.textSecondary} />
+                <Text style={styles.mainInfoText}>{displaySalary}</Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
@@ -84,10 +111,12 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
             <View style={styles.horizontalDivider} />
 
             {/* About the Role */}
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionHeader}>About the Role</Text>
-              <Text style={styles.descriptionText}>{displayDescription}</Text>
-            </View>
+            {!!displayDescription && (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionHeader}>About the Role</Text>
+                <Text style={styles.descriptionText}>{displayDescription}</Text>
+              </View>
+            )}
 
             {/* Details Grid Table */}
             <View style={styles.gridContainer}>
@@ -99,7 +128,7 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
                   </View>
                   <View>
                     <Text style={styles.gridLabel}>Experience</Text>
-                    <Text style={styles.gridValue}>{displayExperience}</Text>
+                    <Text style={styles.gridValue}>{displayExperience || 'N/A'}</Text>
                   </View>
                 </View>
                 <View style={styles.gridCellNoRight}>
@@ -108,7 +137,7 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
                   </View>
                   <View>
                     <Text style={styles.gridLabel}>Education</Text>
-                    <Text style={styles.gridValue}>{displayEducation}</Text>
+                    <Text style={styles.gridValue}>{displayEducation || 'N/A'}</Text>
                   </View>
                 </View>
               </View>
@@ -130,7 +159,7 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
                   </View>
                   <View>
                     <Text style={styles.gridLabel}>Category</Text>
-                    <Text style={styles.gridValue}>{displayCategory}</Text>
+                    <Text style={styles.gridValue}>{displayCategory || 'N/A'}</Text>
                   </View>
                 </View>
               </View>
@@ -143,7 +172,7 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
                   </View>
                   <View>
                     <Text style={styles.gridLabel}>Job Type</Text>
-                    <Text style={styles.gridValue}>{displayJobType}</Text>
+                    <Text style={styles.gridValue}>{displayJobType || 'N/A'}</Text>
                   </View>
                 </View>
                 <View style={styles.gridCellNoRight}>
@@ -152,66 +181,62 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
                   </View>
                   <View>
                     <Text style={styles.gridLabel}>Location</Text>
-                    <Text style={styles.gridValue}>{displayLocation}</Text>
+                    <Text style={styles.gridValue}>{displayLocation || 'N/A'}</Text>
                   </View>
                 </View>
               </View>
             </View>
 
             {/* Required Skills */}
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionHeader}>Required Skills</Text>
-              <View style={styles.skillsContainer}>
-                {skillItems.map((skill: string) => (
-                  <View key={skill} style={styles.skillChip}>
-                    <Text style={styles.skillChipText}>{skill}</Text>
-                  </View>
-                ))}
+            {skillItems.length > 0 && (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionHeader}>Required Skills</Text>
+                <View style={styles.skillsContainer}>
+                  {skillItems.map((skill: string) => (
+                    <View key={skill} style={styles.skillChip}>
+                      <Text style={styles.skillChipText}>{skill}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Benefits */}
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionHeader}>Benefits</Text>
-              <View style={styles.benefitsContainer}>
-                {benefitItems.map((benefit: string, idx: number) => {
-                  let IconComponent = Gift;
-                  const name = benefit.toLowerCase();
-                  if (name.includes('health') || name.includes('insurance') || name.includes('medical')) {
-                    IconComponent = Heart;
-                  } else if (name.includes('hour') || name.includes('flexible') || name.includes('time')) {
-                    IconComponent = Clock;
-                  } else if (name.includes('remote') || name.includes('wfh') || name.includes('work')) {
-                    IconComponent = Monitor;
-                  } else if (name.includes('bonus') || name.includes('performance') || name.includes('incentive')) {
-                    IconComponent = Gift;
-                  }
+            {benefitItems.length > 0 && (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionHeader}>Benefits</Text>
+                <View style={styles.benefitsRow}>
+                  {benefitItems.map((benefit: string, idx: number) => {
+                    let IconComponent = Gift;
+                    const name = benefit.toLowerCase();
+                    if (name.includes('health') || name.includes('insurance') || name.includes('medical')) {
+                      IconComponent = Heart;
+                    } else if (name.includes('hour') || name.includes('flexible') || name.includes('time')) {
+                      IconComponent = Clock;
+                    } else if (name.includes('remote') || name.includes('wfh') || name.includes('work')) {
+                      IconComponent = Monitor;
+                    } else if (name.includes('bonus') || name.includes('performance') || name.includes('incentive')) {
+                      IconComponent = Gift;
+                    }
 
-                  // Split benefit to multi-line for alignment if multi-word
-                  const words = benefit.split(' ');
-                  let formattedText = benefit;
-                  if (words.length > 1) {
-                    formattedText = `${words[0]}\n${words.slice(1).join(' ')}`;
-                  }
-
-                  return (
-                    <React.Fragment key={idx}>
-                      <View style={styles.benefitCell}>
-                        <IconComponent size={RFValue(12)} color={Colors.textSecondary} />
-                        <Text style={styles.benefitText}>{formattedText}</Text>
+                    return (
+                      <View key={idx} style={styles.benefitChip}>
+                        <IconComponent size={RFValue(10)} color={Colors.primary} />
+                        <Text style={styles.benefitChipText}>{benefit}</Text>
                       </View>
-                      {idx < benefitItems.length - 1 && <View style={styles.benefitVerticalDivider} />}
-                    </React.Fragment>
-                  );
-                })}
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Urgently Hiring Badge */}
-            <View style={styles.urgentlyHiringContainer}>
-              <Zap size={RFValue(12)} color={Colors.primary} fill={Colors.primary} />
-              <Text style={styles.urgentlyHiringText}>Urgently Hiring</Text>
-            </View>
+            {!!job.rawJob?.is_urgent && (
+              <View style={styles.urgentlyHiringContainer}>
+                <Zap size={RFValue(12)} color={Colors.primary} fill={Colors.primary} />
+                <Text style={styles.urgentlyHiringText}>Urgently Hiring</Text>
+              </View>
+            )}
           </RAnimated.View>
         )}
       </RAnimated.View>
@@ -384,40 +409,39 @@ const styles = StyleSheet.create({
     gap: wp('2%'),
   },
   skillChip: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: Colors.primary + '12',
     paddingHorizontal: wp('3.5%'),
     paddingVertical: hp('0.6%'),
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary + '25',
   },
   skillChipText: {
     fontSize: RFValue(9),
-    color: '#374151',
-    fontWeight: '500',
+    color: Colors.primary,
+    fontWeight: '600',
   },
-  benefitsContainer: {
+  benefitsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp('2%'),
+    marginTop: hp('0.5%'),
+  },
+  benefitChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.white,
-    paddingVertical: hp('0.5%'),
-  },
-  benefitCell: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: Colors.primary + '08',
+    borderColor: Colors.primary + '20',
+    borderWidth: 1,
+    paddingHorizontal: wp('3%'),
+    paddingVertical: hp('0.6%'),
+    borderRadius: 8,
     gap: wp('1.5%'),
-    justifyContent: 'center',
   },
-  benefitText: {
-    fontSize: RFValue(8.5),
-    color: Colors.textSecondary,
-    lineHeight: RFValue(11),
+  benefitChipText: {
+    fontSize: RFValue(9),
+    color: Colors.textPrimary,
     fontWeight: '500',
-  },
-  benefitVerticalDivider: {
-    width: 1,
-    height: hp('3.5%'),
-    backgroundColor: Colors.border,
   },
   urgentlyHiringContainer: {
     flexDirection: 'row',

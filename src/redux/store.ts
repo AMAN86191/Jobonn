@@ -3,6 +3,7 @@ import auth from './AuthSlice';
 import companyHome from './CompanyHomeSlice';
 import candidateProfile from './CandidateProfileSlice';
 import postJob from './PostJobSlice';
+import candidateJobs from './CandidateJobSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     companyHome: companyHome,
     candidateProfile: candidateProfile,
     postJob: postJob,
+    candidateJobs: candidateJobs,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

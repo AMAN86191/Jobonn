@@ -7,7 +7,11 @@ import AppBackground from '../../components/layout/AppBackground';
 import CustomButton from '../../components/buttons/CustomButton';
 import Animated, { FadeInDown, BounceIn } from 'react-native-reanimated';
 
-const ApplicationSuccessScreen = ({ navigation }: any) => {
+const ApplicationSuccessScreen = ({ navigation, route }: any) => {
+  const job = route.params?.job;
+  const displayTitle = job?.title || job?.job_title?.job_name || 'Job';
+  const displayCompany = job?.company || job?.company?.company_name || 'Company';
+
   return (
     <AppBackground>
       <View style={styles.container}>
@@ -19,7 +23,7 @@ const ApplicationSuccessScreen = ({ navigation }: any) => {
           <Animated.View entering={FadeInDown.delay(500).duration(800)} style={styles.textContainer}>
             <Text style={styles.title}>Application Submitted!</Text>
             <Text style={styles.subtitle}>
-              Your application for <Text style={styles.highlight}>Senior React Native Developer</Text> at <Text style={styles.highlight}>TechCorp Solutions</Text> has been successfully submitted.
+              Your application for <Text style={styles.highlight}>{displayTitle}</Text> at <Text style={styles.highlight}>{displayCompany}</Text> has been successfully submitted.
             </Text>
           </Animated.View>
 
