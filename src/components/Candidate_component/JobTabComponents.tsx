@@ -7,100 +7,148 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import JobCard from './JobCard';
 import { jobs } from '../../data/jobonnStaticData';
 
-export const JobDetailsTabContent = ({ job }: { job?: any }) => (
-  <View>
-    <View style={styles.infoCard}>
-      <View style={styles.cardRow}>
-        <Briefcase color={Colors.textSecondary} size={RFValue(13)} />
-        <Text style={styles.cardText}>{job?.experience || job?.type || '0-5 Yrs'}</Text>
-      </View>
-      <View style={styles.cardRow}>
-        <Users color={Colors.textSecondary} size={RFValue(13)} />
-        <Text style={styles.cardText}>{job?.openings || job?.vacancies || 1} vacancy</Text>
-      </View>
-      <View style={styles.cardRow}>
-        <MapPin color={Colors.textSecondary} size={RFValue(13)} />
-        <Text style={styles.cardText}>{job?.location || 'Jaipur'}</Text>
-      </View>
-      <View style={styles.cardRow}>
-        <IndianRupee color={Colors.textSecondary} size={RFValue(13)} />
-        <Text style={styles.cardText}>{job?.salary || 'Not disclosed'}</Text>
-      </View>
-      <View style={styles.cardRow}>
-        <PenTool color={Colors.textSecondary} size={RFValue(13)} />
-        <Text style={styles.cardText}>{(job?.skills || []).join(', ') || 'React Native, TypeScript, APIs'}</Text>
+export const JobDetailsTabContent = ({ job }: { job?: any }) => {
+  const hasInfoCard = job?.experience || job?.type || job?.openings || job?.vacancies || job?.location || job?.salary;
+  const hasMetaCard = job?.category || job?.department || job?.title || job?.job_type || job?.education;
+  return (
+    <View>
+      {hasInfoCard ? (
+        <View style={styles.infoCard}>
+          {!!(job?.experience || job?.type) && (
+            <View style={styles.cardRow}>
+              <Briefcase color={Colors.textSecondary} size={RFValue(13)} />
+              <Text style={styles.cardText}>{job.experience || job.type}</Text>
+            </View>
+          )}
+          {!!(job?.openings || job?.vacancies) && (
+            <View style={styles.cardRow}>
+              <Users color={Colors.textSecondary} size={RFValue(13)} />
+              <Text style={styles.cardText}>{job.openings || job.vacancies} vacancy</Text>
+            </View>
+          )}
+          {!!job?.location && (
+            <View style={styles.cardRow}>
+              <MapPin color={Colors.textSecondary} size={RFValue(13)} />
+              <Text style={styles.cardText}>{job.location}</Text>
+            </View>
+          )}
+          {!!job?.salary && (
+            <View style={styles.cardRow}>
+              <IndianRupee color={Colors.textSecondary} size={RFValue(13)} />
+              <Text style={styles.cardText}>{job.salary}</Text>
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {!!(job?.description || job?.rawJob?.job_description || (job?.responsibilities && job?.responsibilities.length > 0) || (job?.rawJob?.responsibilities && job?.rawJob?.responsibilities.length > 0)) && (
+        <View>
+          <Text style={styles.jdMainTitle}>Job description</Text>
+          <View style={styles.infoCard}>
+            {(job?.description || job?.rawJob?.job_description) ? (
+              <Text style={styles.jdText}>{job.description || job.rawJob.job_description}</Text>
+            ) : null}
+            {((job?.responsibilities && job.responsibilities.length > 0 ? job.responsibilities : job?.rawJob?.responsibilities) || []).map((item: string) => (
+              <Text key={item} style={styles.jdText}>- {item}</Text>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {!!(job?.skills && job.skills.length > 0) && (
+        <View style={styles.skillsSection}>
+          <Text style={styles.jdMainTitle}>Required Skills</Text>
+          <View style={styles.skillsContainer}>
+            {job.skills.map((skill: string) => (
+              <View key={skill} style={styles.skillBadge}>
+                <Text style={styles.skillText}>{skill}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {hasMetaCard ? (
+        <View style={styles.infoCard}>
+          {!!job?.category && (
+            <View style={styles.metaSection}>
+              <Text style={styles.metaLabel}>Industry type</Text>
+              <Text style={styles.metaValue}>{job.category}</Text>
+            </View>
+          )}
+          {!!job?.department && (
+            <View style={styles.metaSection}>
+              <Text style={styles.metaLabel}>Department</Text>
+              <Text style={styles.metaValue}>{job.department}</Text>
+            </View>
+          )}
+          {!!job?.title && (
+            <View style={styles.metaSection}>
+              <Text style={styles.metaLabel}>Role</Text>
+              <Text style={styles.metaValue}>{job.title}</Text>
+            </View>
+          )}
+          {!!job?.job_type && (
+            <View style={styles.metaSection}>
+              <Text style={styles.metaLabel}>Employment type</Text>
+              <Text style={styles.metaValue}>{job.job_type}</Text>
+            </View>
+          )}
+          {!!job?.education && (
+            <View style={styles.metaSection}>
+              <Text style={styles.metaLabel}>Education</Text>
+              <Text style={styles.metaValue}>{job.education}</Text>
+            </View>
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+export const AboutCompanyTabContent = ({ job }: { job?: any }) => {
+  if (!job?.company && !job?.aboutCompany) return null;
+  return (
+    <View>
+      {!!job?.company && <Text style={styles.jdMainTitle}>{job.company}</Text>}
+      {!!job?.aboutCompany && <Text style={styles.jdText}>{job.aboutCompany}</Text>}
+
+      <View style={styles.infoList}>
+        {!!job?.category && (
+          <View style={[styles.infoRow, { marginTop: hp(2) }]}>
+            <Building color={Colors.textSecondary} size={RFValue(14)} />
+            <Text style={styles.infoText}>{job.category}</Text>
+          </View>
+        )}
+        <View style={styles.infoRow}>
+          <Users color={Colors.textSecondary} size={RFValue(14)} />
+          <Text style={styles.infoText}>Verified employer</Text>
+        </View>
+        {!!job?.location && (
+          <View style={styles.infoRow}>
+            <MapPin color={Colors.textSecondary} size={RFValue(14)} />
+            <Text style={styles.infoText}>{job.location}</Text>
+          </View>
+        )}
       </View>
     </View>
+  );
+};
 
-    <Text style={styles.jdMainTitle}>Job description</Text>
-
-    <View style={styles.infoCard}>
-      <Text style={styles.jdSubTitle}>What you'll do</Text>
-      <Text style={styles.jdText}>{job?.description || 'Build reliable mobile hiring workflows and collaborate with product teams.'}</Text>
-      {(job?.responsibilities || []).map((item: string) => (
-        <Text key={item} style={styles.jdText}>- {item}</Text>
+export const BenefitsTabContent = ({ job }: { job?: any }) => {
+  if (!job?.benefits || job.benefits.length === 0) return null;
+  return (
+    <View>
+      <Text style={styles.jdMainTitle}>Employee Benefits</Text>
+      {job.benefits.map((benefit: string) => (
+        <View key={benefit} style={styles.roleBulletRow}>
+          <CheckCircle color={Colors.success} size={RFValue(14)} />
+          <Text style={styles.roleBulletText}>{benefit}</Text>
+        </View>
       ))}
-      <Text style={[styles.disclaimerText, { marginTop: hp(3) }]}>Static MVP data. Live availability and final details will be confirmed when backend APIs are connected.</Text>
     </View>
-
-    <View style={styles.infoCard}>
-      <View style={styles.metaSection}>
-        <Text style={styles.metaLabel}>Industry type</Text>
-        <Text style={styles.metaValue}>{job?.category || 'Recruitment Technology'}</Text>
-      </View>
-      <View style={styles.metaSection}>
-        <Text style={styles.metaLabel}>Department</Text>
-        <Text style={styles.metaValue}>{job?.department || 'Engineering'}</Text>
-      </View>
-      <View style={styles.metaSection}>
-        <Text style={styles.metaLabel}>Role</Text>
-        <Text style={styles.metaValue}>{job?.title || 'Front End Developer'}</Text>
-      </View>
-      <View style={styles.metaSection}>
-        <Text style={styles.metaLabel}>Employment type</Text>
-        <Text style={styles.metaValue}>{job?.job_type || 'Full Time'}</Text>
-      </View>
-      <View style={styles.metaSection}>
-        <Text style={styles.metaLabel}>Education</Text>
-        <Text style={styles.metaValue}>{job?.education || 'Graduate'}</Text>
-      </View>
-    </View>
-  </View>
-);
-
-export const AboutCompanyTabContent = ({ job }: { job?: any }) => (
-  <View>
-    <Text style={styles.jdMainTitle}>{job?.company || 'Jobonn Partner'}</Text>
-    <Text style={styles.jdText}>{job?.aboutCompany || 'A verified company hiring through the Jobonn recruitment operating system.'}</Text>
-
-    <View style={styles.infoList}>
-      <View style={[styles.infoRow, { marginTop: hp(2) }]}>
-        <Building color={Colors.textSecondary} size={RFValue(14)} />
-        <Text style={styles.infoText}>{job?.category || 'Recruitment Technology'}</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Users color={Colors.textSecondary} size={RFValue(14)} />
-        <Text style={styles.infoText}>Verified employer</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <MapPin color={Colors.textSecondary} size={RFValue(14)} />
-        <Text style={styles.infoText}>{job?.location || 'India'}</Text>
-      </View>
-    </View>
-  </View>
-);
-
-export const BenefitsTabContent = ({ job }: { job?: any }) => (
-  <View>
-    <Text style={styles.jdMainTitle}>Employee Benefits</Text>
-    {(job?.benefits || ['Health Insurance', 'Flexible Working Hours', 'Performance Bonus']).map((benefit: string) => (
-      <View key={benefit} style={styles.roleBulletRow}>
-        <CheckCircle color={Colors.success} size={RFValue(14)} />
-        <Text style={styles.roleBulletText}>{benefit}</Text>
-      </View>
-    ))}
-  </View>
-);
+  );
+};
 
 export const SimilarJobsTabContent = ({ currentJobId }: { currentJobId?: string }) => (
   <View style={{ marginTop: hp(1) }}>
@@ -251,5 +299,28 @@ const styles = StyleSheet.create({
     fontSize: RFValue(10.5),
     color: Colors.textSecondary,
     lineHeight: hp('2%'),
+  },
+  skillsSection: {
+    marginTop: hp('1%'),
+    marginBottom: hp('3%'),
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp('2%'),
+    marginTop: hp('1%'),
+  },
+  skillBadge: {
+    backgroundColor: Colors.primary + '12',
+    paddingVertical: hp('0.8%'),
+    paddingHorizontal: wp('3.5%'),
+    borderRadius: wp('4%'),
+    borderWidth: 1,
+    borderColor: Colors.primary + '25',
+  },
+  skillText: {
+    fontSize: RFValue(10),
+    color: Colors.primary,
+    fontWeight: '600',
   },
 });

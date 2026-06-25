@@ -11,8 +11,11 @@ import { candidateProfile, jobs, jobInvites, getApplicationJobs } from '../../da
 import CandidateProfileCompletenessBanner from '../../components/Manager_component/CandidateProfileCompletenessBanner';
 import { getCandidateProfileCompleteness } from '../../utils/candidateProfileCompleteness';
 
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { getProfileSlice } from '../../redux/CandidateProfileSlice';
+import { fetchCandidateJobsSlice } from '../../redux/CandidateJobSlice';
+import { normalizeBackendJob } from '../../utils/jobNormalizer';
+import { ActivityIndicator } from 'react-native';
 
 const FEATURED_JOBS = jobs.filter(job => job.isFeatured);
 
@@ -44,6 +47,16 @@ const CandidateHomeScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const [activeCategory, setActiveCategory] = useState(1);
   const [user, setUser] = useState<any>(null);
+
+  const { jobs: rawJobs, loading: jobsLoading } = useSelector((state: any) => state.candidateJobs);
+
+  useEffect(() => {
+    dispatch(fetchCandidateJobsSlice(1) as any);
+  }, [dispatch]);
+
+  const normalizedJobs = React.useMemo(() => {
+    return (rawJobs || []).slice(0, 10).map((job: any) => normalizeBackendJob(job));
+  }, [rawJobs]);
 
    const loadUser = async () => {
     try {
@@ -200,29 +213,35 @@ const CandidateHomeScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {FEATURED_JOBS.map(job => (
-          <JobCard
-            key={job.id}
-            {...job}
-            onPress={() => navigation.navigate('JobDetails', { job })}
-          />
-        ))}
+        {jobsLoading && normalizedJobs.length === 0 ? (
+          <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('2%') }} />
+        ) : normalizedJobs.length === 0 ? (
+          <Text style={{ textAlign: 'center', color: Colors.textTertiary, marginVertical: hp('2%'), fontSize: RFValue(10) }}>No featured jobs found</Text>
+        ) : (
+          normalizedJobs.map((job: any) => (
+            <JobCard
+              key={job.id}
+              {...job}
+              onPress={() => navigation.navigate('JobDetails', { job })}
+            />
+          ))
+        )}
 
         {/* Recommended Jobs */}
-        <View style={styles.sectionHeader}>
+        {/* <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recommended For You</Text>
           <TouchableOpacity onPress={() => navigation.navigate('JobsTab')}>
             <Text style={styles.seeAllText}>See all {'>'}</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
-        {RECOMMENDED_JOBS.map(job => (
+        {/* {RECOMMENDED_JOBS.map(job => (
           <JobCard
             key={`rec-${job.id}`}
             {...job}
             onPress={() => navigation.navigate('JobDetails', { job })}
           />
-        ))}
+        ))} */}
 
         {/* Top Companies Hiring */}
         <View style={styles.sectionHeader}>

@@ -160,7 +160,13 @@ console.log('isEditMode', isEditMode)
         });
 
         if (isEditMode) {
-          navigation.goBack();
+          navigation.navigate('ManagerHome', {
+            screen: 'ManagerTabNavigator',
+            params: {
+              screen: 'ManagerProfileTab',
+              params: { refresh: Date.now() },
+            },
+          } as any);
         } else {
           setIsCompleted(true);
         }

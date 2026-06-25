@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
+  runOnJS,
 } from 'react-native-reanimated';
 import { RFValue } from 'react-native-responsive-fontsize';
 import { Colors } from '../../theme/Colors';
@@ -44,9 +45,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const [localRanges, setLocalRanges] = useState<Record<string, [number, number]>>({});
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [shouldRender, setShouldRender] = useState(visible);
 
   useEffect(() => {
     if (visible) {
+      setShouldRender(true);
       translateX.value = withTiming(0, {
         duration: 300,
         easing: Easing.out(Easing.quad)
@@ -57,7 +60,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
         duration: 250,
         easing: Easing.in(Easing.quad)
       });
-      backdropOpacity.value = withTiming(0, { duration: 250 });
+      backdropOpacity.value = withTiming(0, { duration: 250 }, (finished) => {
+        if (finished) {
+          runOnJS(setShouldRender)(false);
+        }
+      });
     }
   }, [visible]);
 
@@ -85,10 +92,10 @@ const FilterModal: React.FC<FilterModalProps> = ({
     opacity: backdropOpacity.value,
   }));
 
-  if (!visible && backdropOpacity.value === 0) return null;
+  if (!shouldRender) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible={shouldRender} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />

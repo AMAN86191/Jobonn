@@ -34,7 +34,8 @@ export const getProfileCompleteness = (company: any): CompletenessResult => {
   // Extract fields supporting both raw and normalized keys
   const companyName = companyObj.company_name || companyObj.companyName || '';
   const bio = companyObj.company_about || companyObj.bio || '';
-  const location = companyObj.office_location || companyObj.location || companyObj.headquarters || '';
+  const rawLoc = companyObj.office_location || companyObj.location || companyObj.headquarters || '';
+  const location = typeof rawLoc === 'object' && rawLoc !== null ? (rawLoc.location_name || '') : String(rawLoc);
   const industry = companyObj.industry_type || companyObj.industry || '';
   const companySize = companyObj.company_size || companyObj.companySize || '';
   const website = companyObj.company_web_url || companyObj.website || '';

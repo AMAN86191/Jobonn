@@ -1,3 +1,11 @@
+const extractLocationName = (val: any): string => {
+  if (!val) return '';
+  if (typeof val === 'object') {
+    return val.location_name || val.name || '';
+  }
+  return String(val);
+};
+
 export const normalizeProfileData = (data: any) => {
   if (!data) {
     return {
@@ -50,14 +58,14 @@ export const normalizeProfileData = (data: any) => {
   const role = userObj.role || 'company';
   const companyid = companyObj?.id || data?.company_id || data?.id || '';
   const companyName = companyObj.company_name || companyObj.companyName || '';
-  const location = companyObj.office_location || companyObj.location || '';
+  const location = extractLocationName(companyObj.office_location || companyObj.location || '');
   const industry = companyObj.industry_type || companyObj.industry || '';
   const companySize = companyObj.company_size || companyObj.companySize || '';
   const website = companyObj.company_web_url || companyObj.website || '';
   const bio = companyObj.company_about || companyObj.bio || '';
   const gstNumber = companyObj.gst_no || companyObj.gstNumber || '';
   const foundedIn = companyObj.founded_date || companyObj.foundedIn || '';
-  const headquarters = companyObj.office_location || companyObj.headquarters || '';
+  const headquarters = extractLocationName(companyObj.office_location || companyObj.headquarters || '');
   const jobTitle = companyObj.job_title || companyObj.jobTitle || '';
   const verificationStatus = companyObj.verificationStatus || (companyObj.company_docs ? 'Pending Verification' : 'Profile Incomplete');
   const coverImage = companyObj.cover_img || companyObj.coverImage || null;
@@ -80,13 +88,18 @@ export const normalizeProfileData = (data: any) => {
   // Map open positions
   let openPositions = [];
   if (companyObj.openPositions && Array.isArray(companyObj.openPositions)) {
-    openPositions = companyObj.openPositions;
+    openPositions = companyObj.openPositions.map((pos: any) => ({
+      id: String(pos.id),
+      title: pos.title || '',
+      location: extractLocationName(pos.location || ''),
+      type: pos.job_type || pos.type || ''
+    }));
   } else if (companyObj.jobs && Array.isArray(companyObj.jobs)) {
     openPositions = companyObj.jobs.map((j: any) => ({
       id: String(j.id),
       title: j.title || '',
-      location: j.location || '',
-      type: j.job_type || ''
+      location: extractLocationName(j.location || ''),
+      type: j.job_type || j.type || ''
     }));
   }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, StyleSheet, ScrollView, Text, TouchableOpacity, StatusBar,
 } from 'react-native';
@@ -11,7 +11,8 @@ import CandidateCard, { getAvatarColor } from '../../components/Manager_componen
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
 import JobDetailInfoCard from '../../components/Manager_component/JobDetailInfoCard';
 import FilterModal, { FilterSection } from '../../components/Manager_component/FilterModal';
-import { talentDatabase } from '../../data/jobonnStaticData';
+import { talentDatabase, jobs } from '../../data/jobonnStaticData';
+import { normalizeBackendJob } from '../../utils/jobNormalizer';
 
 const APPLICANTS = talentDatabase;
 const FILTER_SECTIONS: FilterSection[] = [
@@ -89,7 +90,13 @@ const FILTER_SECTIONS: FilterSection[] = [
 ];
 const TABS = ['New', 'Shortlisted', 'Invited', 'Accepted Invite', 'Interview', 'Selected', 'Hired', 'Rejected'];
 const ManagerJobDetailsScreen = ({ navigation, route }: any) => {
-  const { job } = route.params || { job: { title: 'Senior React Native Developer', department: 'Engineering' } };
+  const rawJob = route.params?.job;
+  const job = useMemo(() => {
+    if (!rawJob) return jobs[0];
+    if ('workMode' in rawJob) return rawJob;
+    return normalizeBackendJob(rawJob);
+  }, [rawJob]);
+
   const [filterVisible, setFilterVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('New');
   const [selected, setSelected] = useState<Record<string, string[]>>({});

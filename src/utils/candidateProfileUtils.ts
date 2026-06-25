@@ -42,6 +42,14 @@ export const formatYear = (date: Date | null): string => {
   return String(date.getFullYear());
 };
 
+const extractLocName = (val: any): string => {
+  if (!val || val === 'null') return '';
+  if (typeof val === 'object') {
+    return val.location_name || val.name || '';
+  }
+  return String(val);
+};
+
 export const normalizeCandidateProfile = (user: any) => {
   const candObj = user?.candidate || user || {};
 
@@ -87,7 +95,7 @@ export const normalizeCandidateProfile = (user: any) => {
     currentCompany: profDetail.current_company || candObj.currentCompany || '',
     totalExperience: (profDetail.exp_years != null && profDetail.exp_years !== 'null') ? `${profDetail.exp_years} Years ${(profDetail.exp_months != null && profDetail.exp_months !== 'null') ? profDetail.exp_months : 0} Months` : (candObj.totalExperience || null),
     currentCTC: (profDetail.ctc != null && profDetail.ctc !== 'null') ? `${profDetail.ctc}` : (candObj.currentCTC || ''),
-    currentLocation: (profDetail.current_location !== 'null' ? profDetail.current_location : null) || (candObj.currentLocation !== 'null' ? candObj.currentLocation : null) || (candObj.current_location !== 'null' ? candObj.current_location : null) || '',
+    currentLocation: extractLocName(profDetail.current_location) || extractLocName(candObj.currentLocation) || extractLocName(candObj.current_location) || '',
     noticePeriod: careerPref.notice_period || candObj.noticePeriod || '',
     city: profDetail.city || candObj.city || '',
     state: profDetail.state || candObj.state || '',
@@ -95,7 +103,7 @@ export const normalizeCandidateProfile = (user: any) => {
     summary: profDetail.profile_summery || candObj.profile_summery || candObj.profile_summary || candObj.summary || '',
 
     // Career Preferences
-    preferredLocation: careerPref.preferred_location || candObj.preferredLocation || candObj.preferred_location || '',
+    preferredLocation: extractLocName(careerPref.preferred_location) || extractLocName(candObj.preferredLocation) || extractLocName(candObj.preferred_location) || '',
     jobType: Array.isArray(careerPref.preferred_job_types)
       ? careerPref.preferred_job_types.join(', ')
       : (typeof careerPref.preferred_job_types === 'string' ? careerPref.preferred_job_types : (candObj.jobType || '')),
