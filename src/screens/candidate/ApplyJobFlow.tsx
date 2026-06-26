@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, StatusBar, ToastAndroid, Alert } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { ChevronLeft, FileText, CheckCircle2 } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
@@ -172,15 +173,23 @@ const ApplyJobFlow = ({ navigation, route }: any) => {
 
       console.log('Submitting job application...', payload);
       const response = await dispatch(applyJobSlice(payload)).unwrap();
-      console.log('Job applied successfully:', response);
+      console.log('Job applied response:', response);
+
+      if (response && response.status === false) {
+        throw response;
+      }
 
       if (job) {
         logJobApply(job.id, job.title);
       }
       navigation.replace('ApplicationSuccess', { job });
     } catch (err: any) {
-      console.error('Apply job failed:', err);
-      Alert.alert('Application Failed', err?.message || err?.response?.data?.message || 'Failed to submit application.');
+      // console.error('Apply job failed:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Application Failed',
+        text2: 'Your application was not submitted at the moment.',
+      });
     } finally {
       setLoading(false);
     }

@@ -12,10 +12,32 @@ import { Colors } from '../../theme/Colors';
 interface JobDetailInfoCardProps {
   job: any;
   stats: any[];
+  jobStatus?: string;
+  onStatusPress?: () => void;
 }
 
-const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => {
+const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats, jobStatus, onStatusPress }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const getStatusBadgeStyle = (status?: string) => {
+    const s = (status || 'Active').toLowerCase();
+    switch (s) {
+      case 'active':
+        return { bg: '#ECFDF5', text: '#10B981' };
+      case 'closed':
+      case 'deactive':
+      case 'inactive':
+        return { bg: Colors.dangerLight, text: Colors.danger };
+      case 'draft':
+        return { bg: Colors.borderLight, text: Colors.textSecondary };
+      case 'expired':
+        return { bg: Colors.warningLight, text: Colors.warning };
+      default:
+        return { bg: '#ECFDF5', text: '#10B981' };
+    }
+  };
+
+  const statusStyle = getStatusBadgeStyle(jobStatus);
 
   // Fallbacks matching the premium image exactly
   const displayTitle = job.title || '';
@@ -60,17 +82,21 @@ const JobDetailInfoCard: React.FC<JobDetailInfoCardProps> = ({ job, stats }) => 
               {job.posted ? ` • Posted ${job.posted}` : ''}
             </Text>
           </View>
-          <View style={[
-            styles.statusBadge,
-            job.status === 'Closed' && { backgroundColor: Colors.dangerLight }
-          ]}>
+          <TouchableOpacity
+            onPress={onStatusPress}
+            activeOpacity={0.7}
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusStyle.bg }
+            ]}
+          >
             <Text style={[
               styles.statusText,
-              job.status === 'Closed' && { color: Colors.danger }
+              { color: statusStyle.text }
             ]}>
-              {job.status || 'Active'}
+              {jobStatus || 'Active'}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Main Info Row (Location & Salary) */}

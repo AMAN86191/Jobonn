@@ -40,6 +40,7 @@ import PackageManagementScreen from '../screens/manager/PackageManagementScreen'
 import AuditLogScreen from '../screens/manager/AuditLogScreen';
 import UpdateCompanyProfileScreen from '../screens/auth/UpdateCompanyProfileScreen';
 import TermsAndConditionsScreen from '../screens/common/TermsAndConditionsScreen';
+import UpdateJobScreen from '../screens/manager/UpdateJobScreen';
 
 // ─── Route Param List ───────────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -77,6 +78,7 @@ export type RootStackParamList = {
   PackageManagement: undefined;
   AuditLogs: undefined;
   TermsAndConditions: undefined;
+  UpdateJobScreen: { role?: 'candidate' | 'company'; company_id?: string | number; isEditMode?: boolean; profileData?: any;[key: string]: any } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -242,6 +244,10 @@ const Allroute = () => {
         <Stack.Screen
           name="TermsAndConditions"
           component={TermsAndConditionsScreen}
+        />
+        <Stack.Screen
+          name="UpdateJobScreen"
+          component={UpdateJobScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

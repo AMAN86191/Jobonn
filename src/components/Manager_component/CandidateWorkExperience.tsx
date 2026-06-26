@@ -5,7 +5,11 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import { Briefcase } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 
-const CandidateWorkExperience: React.FC = () => {
+interface CandidateWorkExperienceProps {
+  experiences?: any[];
+}
+
+const CandidateWorkExperience: React.FC<CandidateWorkExperienceProps> = ({ experiences = [] }) => {
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeaderRow}>
@@ -16,46 +20,47 @@ const CandidateWorkExperience: React.FC = () => {
       </View>
 
       <View style={styles.timelineContainer}>
-        {/* Item 1 */}
-        <View style={styles.timelineItem}>
-          <View style={styles.timelineIndicator}>
-            <View style={styles.timelineDotActive} />
-            <View style={styles.timelineLine} />
-          </View>
-          
-          <View style={styles.timelineContent}>
-            <View style={styles.timelineTitleRow}>
-              <Text style={styles.timelineJobTitle}>Senior React Native Developer</Text>
-              <View style={styles.durationPill}>
-                <Text style={styles.durationPillText}>3 yrs 4 mos</Text>
+        {experiences.length === 0 ? (
+          <Text style={styles.timelineDesc}>No work experience details added (Fresher).</Text>
+        ) : (
+          experiences.map((exp: any, index: number) => {
+            const isLast = index === experiences.length - 1;
+            const jobTitle = exp.position || exp.job_title || 'Position';
+            const companyName = exp.company || exp.company_name || '';
+            const duration = exp.duration || '';
+            const dateRange = exp.startDate && exp.endDate
+              ? `${exp.startDate} - ${exp.endDate}`
+              : (exp.endDate || exp.startDate || '');
+            
+            return (
+              <View key={index} style={[styles.timelineItem, isLast && { paddingBottom: 0 }]}>
+                <View style={styles.timelineIndicator}>
+                  <View style={index === 0 ? styles.timelineDotActive : styles.timelineDotInactive} />
+                  {!isLast && <View style={styles.timelineLine} />}
+                </View>
+                
+                <View style={styles.timelineContent}>
+                  <View style={styles.timelineTitleRow}>
+                    <Text style={styles.timelineJobTitle}>{jobTitle}</Text>
+                    {duration ? (
+                      <View style={styles.durationPill}>
+                        <Text style={styles.durationPillText}>{duration}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.timelineCompany}>
+                    {companyName}{dateRange ? ` • ${dateRange}` : ''}
+                  </Text>
+                  {exp.description ? (
+                    <Text style={styles.timelineDesc}>
+                      {exp.description}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
-            <Text style={styles.timelineCompany}>Tech Solutions Inc. • Jan 2021 - Present</Text>
-            <Text style={styles.timelineDesc}>
-              Leading the mobile development team, architecting React Native solutions and managing CI/CD pipelines.
-            </Text>
-          </View>
-        </View>
-
-        {/* Item 2 */}
-        <View style={[styles.timelineItem, { paddingBottom: 0 }]}>
-          <View style={styles.timelineIndicator}>
-            <View style={styles.timelineDotInactive} />
-          </View>
-          
-          <View style={styles.timelineContent}>
-            <View style={styles.timelineTitleRow}>
-              <Text style={styles.timelineJobTitle}>Mobile Developer</Text>
-              <View style={styles.durationPill}>
-                <Text style={styles.durationPillText}>1 yr 6 mos</Text>
-              </View>
-            </View>
-            <Text style={styles.timelineCompany}>AppVenturez • Jun 2019 - Dec 2020</Text>
-            <Text style={styles.timelineDesc}>
-              Worked on multiple cross-platform apps using React Native and Flutter. Optimized app performance by 40%.
-            </Text>
-          </View>
-        </View>
+            );
+          })
+        )}
       </View>
     </View>
   );

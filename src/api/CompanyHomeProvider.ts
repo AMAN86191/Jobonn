@@ -34,3 +34,41 @@ export const getCompanyJobs = async (page: number = 1) => {
     throw error.response?.data || error.message;
   }
 };
+
+export const getAppliedCandidates = async (page: number = 1) => {
+  try {
+    const response = await api.get(`/company/applied-candidates?page=${page}`);
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const getAppliedCandidateDetail = async (candidateId: number | string) => {
+  try {
+    const response = await api.get(`/company/applied-candidate-detail/${candidateId}`);
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const updateJobStatus = async (jobId: number | string, status: string) => {
+  try {
+    const response = await api.patch(`/company/job-status-update/${jobId}`, { status });
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const getJobAppliedCandidates = async (jobId: number | string) => {
+  try {
+    const response = await api.get(`/company/job-applied-candidates/${jobId}`);
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
+

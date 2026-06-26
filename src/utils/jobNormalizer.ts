@@ -147,7 +147,7 @@ export const normalizeBackendJob = (job: any): any => {
     job_type: jobTypeStr,
     workMode: workModeStr,
     openings: job.openings || 0,
-    applicants: job.applicants_count || job.applicants || 0,
+    applicants: job.applications_count || job.applicants_count || job.applicants || 0,
     benefits: benefitsArr,
     skills: skillsArr,
     description: job.job_description || '',

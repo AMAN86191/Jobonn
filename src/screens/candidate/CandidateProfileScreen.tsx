@@ -110,6 +110,10 @@ const CandidateProfileScreen = ({ navigation }: any) => {
 
   const { normalizedProfile, normalizedPersonalDetails } = normalizeCandidateProfile(user);
 
+  const isFresher = !user?.candidate?.professional_detail?.experience_level ||
+    user?.candidate?.professional_detail?.experience_level?.toLowerCase() === 'fresher' ||
+    (user?.candidate?.professional_detail?.exp_years == null && user?.candidate?.professional_detail?.exp_months == null) ||
+    (Number(user?.candidate?.professional_detail?.exp_years || 0) === 0 && Number(user?.candidate?.professional_detail?.exp_months || 0) === 0);
 
   const [editData, setEditData] = useState<any>({});
   const [newSkill, setNewSkill] = useState('');
@@ -347,7 +351,9 @@ const CandidateProfileScreen = ({ navigation }: any) => {
           <CareerPreferenceCard profile={normalizedProfile} onEdit={() => openModal('career')} />
           <ProfessionalDetailsCard profile={normalizedProfile} onEdit={() => openModal('professional')} />
           <SkillsCard profile={normalizedProfile} onEdit={() => openModal('skills')} />
-          <ExperienceCard profile={normalizedProfile} onEdit={() => openModal('experience')} />
+          {!isFresher && (
+            <ExperienceCard profile={normalizedProfile} onEdit={() => openModal('experience')} />
+          )}
           <EducationCard profile={normalizedProfile} onEdit={() => openModal('education')} />
           <LanguagesCard profile={normalizedProfile} onEdit={() => openModal('languages')} />
           <PersonalDetailsCard personalDetails={normalizedPersonalDetails} onEdit={() => openModal('personal')} />

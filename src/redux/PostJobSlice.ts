@@ -12,6 +12,7 @@ import {
   SearchSkills,
   CreateSkill,
   PostJob,
+  EditPostJob,
 } from '../api/PostJobProvide';
 
 interface PostJobState {
@@ -177,6 +178,18 @@ export const postJobSlice = createAsyncThunk(
   async (payload: any, { rejectWithValue }) => {
     try {
       const response = await PostJob(payload);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+export const EditPostJobSlice = createAsyncThunk(
+  'PostJob/EditPostJob',
+  async (payload: any, { rejectWithValue }) => {
+    try {
+      const { job_id, ...restPayload } = payload;
+      const response = await EditPostJob(job_id, restPayload);
       return response;
     } catch (error) {
       return rejectWithValue(error);

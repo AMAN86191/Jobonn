@@ -124,3 +124,12 @@ export const PostJob = async (payload: any) => {
         throw payload;
     }
 };
+export const EditPostJob = async (jobId: number | string, payload: any) => {
+    try {
+        const response = await api.put(`/company/update-job/${jobId}`, payload);
+        return response.data;
+    } catch (error: any) {
+        const payload = error.response?.data ?? { message: error.message };
+        throw payload;
+    }
+};

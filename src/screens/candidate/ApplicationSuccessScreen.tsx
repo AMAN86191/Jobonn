@@ -27,12 +27,12 @@ const ApplicationSuccessScreen = ({ navigation, route }: any) => {
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(800).duration(800)} style={styles.statusCard}>
+          {/* <Animated.View entering={FadeInDown.delay(800).duration(800)} style={styles.statusCard}>
             <Text style={styles.statusLabel}>Current Status:</Text>
             <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>Pending Review</Text>
+              <Text style={styles.statusBadgeText}>Under Review</Text>
             </View>
-          </Animated.View>
+          </Animated.View> */}
         </View>
 
         <Animated.View entering={FadeInDown.delay(1000).duration(800)} style={styles.footer}>
@@ -87,37 +87,6 @@ const styles = StyleSheet.create({
   },
   highlight: {
     color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  statusCard: {
-    backgroundColor: Colors.white,
-    padding: wp('5%'),
-    borderRadius: wp('4%'),
-    alignItems: 'center',
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    opacity: 0.8
-  },
-  statusLabel: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginBottom: hp('1%'),
-  },
-  statusBadge: {
-    backgroundColor: Colors.warning + '15',
-    paddingHorizontal: wp('4%'),
-    paddingVertical: hp('1%'),
-    borderRadius: wp('5%'),
-  },
-  statusBadgeText: {
-    ...Typography.bodySmall,
-    color: Colors.warning,
     fontWeight: '700',
   },
   footer: {

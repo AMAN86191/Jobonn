@@ -13,11 +13,15 @@ interface CandidateProfileCardProps {
 const CandidateProfileCard: React.FC<CandidateProfileCardProps> = ({ applicant }) => {
   if (!applicant) return null;
 
-  const displayExperience = applicant.experience || '4 yrs Exp.';
+  const displayExperience = applicant.experience || 'Fresher';
   const displayLocation = applicant.location || 'Bangalore';
   const displayNoticePeriod = applicant.noticePeriod || '15 days';
   const displayMatchScore = applicant.matchScore || '92';
 
+  const imageUrl = applicant.profile_image || applicant.image?.uri || applicant.rawApplication?.candidate?.profile_img || applicant.profile_img;
+  const finalImageUrl = imageUrl
+    ? (imageUrl.startsWith('http') ? imageUrl : `https://admin.jobonn.in/storage/${imageUrl}`)
+    : '';
 
   const size = wp('14%');
   const strokeWidth = 3.5;
@@ -31,7 +35,11 @@ const CandidateProfileCard: React.FC<CandidateProfileCardProps> = ({ applicant }
       {/* Header section with avatar, info and circular progress */}
       <View style={styles.profileHeader}>
         <View style={[styles.avatar]}>
-          <Image source={require("../../../assets/images/boy.png")} style={styles.avatarImage} />
+          {finalImageUrl ? (
+            <Image source={{ uri: finalImageUrl }} style={styles.avatarImage} />
+          ) : (
+            <Image source={require("../../../assets/images/boy.png")} style={styles.avatarImage} />
+          )}
         </View>
 
         <View style={styles.profileMeta}>
@@ -47,11 +55,6 @@ const CandidateProfileCard: React.FC<CandidateProfileCardProps> = ({ applicant }
               <MapPin size={RFValue(8.5)} color={Colors.textSecondary} />
               <Text style={styles.metaText}>{displayLocation}</Text>
             </View>
-            {/* <View style={styles.metaItem}>
-              <Clock size={RFValue(8.5)} color={Colors.textSecondary} />
-              <Text style={styles.metaText}>{displayNoticePeriod}</Text>
-            </View> */}
-
           </View>
         </View>
 
@@ -94,20 +97,28 @@ const CandidateProfileCard: React.FC<CandidateProfileCardProps> = ({ applicant }
 
       {/* CTC Breakdown Grid */}
       <View style={styles.ctcRow}>
-        <View style={styles.ctcItemSmall}>
-          <Text style={styles.ctcLabel}>Current CTC</Text>
-          <Text style={styles.ctcValueSmall}>{applicant.currentCTC || '18 LPA'}</Text>
-        </View>
-        <View style={styles.verticalDivider} />
+        {displayExperience.toLowerCase() !== 'fresher' && (
+          <>
+            <View style={styles.ctcItemSmall}>
+              <Text style={styles.ctcLabel}>Current CTC</Text>
+              <Text style={styles.ctcValueSmall}>{applicant.currentCTC || 'Not Disclosed'}</Text>
+            </View>
+            <View style={styles.verticalDivider} />
+          </>
+        )}
         <View style={styles.ctcItemSmall}>
           <Text style={styles.ctcLabel}>Notice Period</Text>
           <Text style={styles.ctcValueSmall}>{displayNoticePeriod}</Text>
         </View>
-        <View style={styles.verticalDivider} />
-        <View style={styles.ctcItemSmall}>
-          <Text style={styles.ctcLabel}>Expected CTC</Text>
-          <Text style={styles.ctcValueSmall}>{applicant.expectedCTC || '22 LPA'}</Text>
-        </View>
+        {displayExperience.toLowerCase() !== 'fresher' && (
+          <>
+            <View style={styles.verticalDivider} />
+            <View style={styles.ctcItemSmall}>
+              <Text style={styles.ctcLabel}>Expected CTC</Text>
+              <Text style={styles.ctcValueSmall}>{applicant.expectedCTC || 'Not Disclosed'}</Text>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );

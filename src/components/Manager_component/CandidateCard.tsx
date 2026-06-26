@@ -18,20 +18,20 @@ interface CandidateCardProps {
   onPress?: () => void;
   avatarColor?: string;
   image?: ImageSourcePropType;
+  appliedJob?: string;
 }
 
 const CandidateCard: React.FC<CandidateCardProps> = ({
-  name, role, experience, location, status, currentCTC, expectedCTC, time, onPress, avatarColor, image
+  name, role, experience, location, status, currentCTC, expectedCTC, time, onPress, avatarColor, image, appliedJob
 }) => {
   const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const bgColor = avatarColor ?? Colors.primary;
-  console.log('image', image);
 
   // Calculate fallbacks cleanly
-  const currentVal = currentCTC || '18 LPA';
+  const currentVal = currentCTC || '';
   const expectedVal = expectedCTC || (currentVal.includes('LPA')
-    ? `${parseInt(currentVal) + 4} LPA`
-    : '22 LPA');
+    ? `${parseInt(currentVal)} LPA`
+    : '');
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -46,6 +46,11 @@ const CandidateCard: React.FC<CandidateCardProps> = ({
         <View style={styles.info}>
           <Text style={styles.name}>{name}</Text>
           <Text style={styles.role} numberOfLines={1}>{role}</Text>
+          {appliedJob ? (
+            <View style={styles.appliedJobBadge}>
+              <Text style={styles.appliedJobText}>Applied: {appliedJob}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.headerRight}>
           {status && <StatusBadge status={status} />}
@@ -56,19 +61,19 @@ const CandidateCard: React.FC<CandidateCardProps> = ({
       <View style={styles.metaRow}>
         <View style={styles.metaLeft}>
           <View style={styles.metaItem}>
-            <Briefcase color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} />
+            <Briefcase color={Colors.textSecondary} size={RFValue(8)} strokeWidth={2.5} />
             <Text style={styles.metaText}>{experience}</Text>
           </View>
-          <View style={styles.divider} />
           <View style={styles.metaItem}>
-            <MapPin color={Colors.textTertiary} size={RFValue(8)}  />
+            <MapPin color={Colors.textSecondary} size={RFValue(8)} strokeWidth={2.5} />
             <Text style={styles.metaText}>{location}</Text>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.metaItem}>
-            <IndianRupee color={Colors.textTertiary} size={RFValue(8)}  />
-            <Text style={styles.metaText}>{currentVal} (Cur) • {expectedVal} (Exp)</Text>
-          </View>
+          {experience?.toLowerCase() !== 'fresher' && (currentVal || expectedVal) ? (
+            <View style={styles.metaItem}>
+              <IndianRupee color={Colors.textSecondary} size={RFValue(8)} strokeWidth={2.5} />
+              <Text style={styles.metaText}>{currentVal} (Cur) • {expectedVal} (Exp)</Text>
+            </View>
+          ) : null}
         </View>
 
         <TouchableOpacity style={styles.viewDetailsBtn} onPress={onPress} activeOpacity={0.7}>
@@ -87,20 +92,20 @@ export const getAvatarColor = (name: string) =>
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.white,
-    borderRadius: wp('3%'),
-    padding: wp('3%'),
+    borderRadius: wp('2.5%'),
+    padding: wp('2.5%'),
     marginBottom: hp('1%'),
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: hp('0.8%') },
+  header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: hp('0.6%') },
   avatar: {
-    width: wp('8%'),
-    height: wp('8%'),
-    borderRadius: wp('2%'),
+    width: wp('10%'),
+    height: wp('10%'),
+    borderRadius: wp('5%'),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: wp('2.5%'),
+    marginRight: wp('2%'),
     overflow: 'hidden',
   },
   avatarImage: {
@@ -108,16 +113,17 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
-  avatarText: { fontWeight: '800', fontSize: RFValue(10) },
+  avatarText: { fontWeight: '800', fontSize: RFValue(9) },
   info: { flex: 1 },
-  name: { fontSize: RFValue(10.5), fontWeight: '400', color: Colors.textPrimary, marginBottom: hp('0.15%') },
-  role: { fontSize: RFValue(8.5), color: Colors.textSecondary },
-  headerRight: { alignItems: 'flex-end', gap: hp('0.4%') },
-  time: { fontSize: RFValue(7.5), color: Colors.textTertiary },
+  name: { fontSize: RFValue(9.5), fontWeight: '600', color: Colors.textPrimary, marginBottom: hp('0.1%') },
+  role: { fontSize: RFValue(8), color: Colors.textSecondary },
+  headerRight: { alignItems: 'flex-end', gap: hp('0.3%') },
+  time: { fontSize: RFValue(7), color: Colors.textTertiary },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: hp('0.5%'),
   },
   metaLeft: {
     flexDirection: 'row',
@@ -125,17 +131,37 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     flex: 1,
     marginRight: wp('2%'),
-    rowGap: hp('0.5%'),
+    gap: wp('1.5%'),
   },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: wp('0.8%') },
-  metaText: { fontSize: RFValue(8.5), color: Colors.textSecondary },
-  divider: { width: 1, height: hp('1.2%'), backgroundColor: Colors.border, marginHorizontal: wp('1.5%') },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.borderLight,
+    paddingHorizontal: wp('2%'),
+    paddingVertical: hp('0.3%'),
+    borderRadius: wp('1.5%'),
+    gap: wp('1%'),
+  },
+  metaText: { fontSize: RFValue(7.5), color: Colors.textSecondary },
   viewDetailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp('0.2%'),
   },
-  viewDetailsText: { fontSize: RFValue(8.5), color: Colors.primary, fontWeight: '700' },
+  viewDetailsText: { fontSize: RFValue(8), color: Colors.primary, fontWeight: '700' },
+  appliedJobBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primary + '12',
+    paddingHorizontal: wp('1.5%'),
+    paddingVertical: hp('0.25%'),
+    borderRadius: wp('1%'),
+    marginTop: hp('0.3%'),
+  },
+  appliedJobText: {
+    fontSize: RFValue(7),
+    color: Colors.primary,
+    fontWeight: '700',
+  },
 });
 
 export default CandidateCard;
