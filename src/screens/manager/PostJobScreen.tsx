@@ -10,7 +10,8 @@ import Animated, { FadeInRight } from 'react-native-reanimated';
 import { Colors } from '../../theme/Colors';
 import { Typography } from '../../theme/Typography';
 import DatePickerInput from '../../components/forms/DatePickerInput';
-import { ToastAndroid, ActivityIndicator } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SearchableDropdown from '../../components/forms/SearchableDropdown';
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
@@ -450,14 +451,49 @@ const PostJobScreen = ({ navigation }: any) => {
       };
 
       console.log('PostJob Payload:', payload);
-      ToastAndroid.show('Job published successfully!', ToastAndroid.SHORT);
       const response = await dispatch(postJobSlice(payload)).unwrap();
       console.log('PostJob response:', response);
 
+      if (response && (response.status === false || (response.status_code && response.status_code !== 200 && response.status_code !== 201 && response.status_code !== '200' && response.status_code !== '201'))) {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to Post Job',
+          text2: response.message || 'Failed to process job request',
+        });
+        return;
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: response?.message || 'Job published successfully!',
+      });
       navigation.goBack();
     } catch (error: any) {
       console.log('error', error);
-      ToastAndroid.show(error?.message || error?.response?.data?.message || 'Failed to process job request', ToastAndroid.LONG);
+      let errorMessage = 'Failed to process job request';
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        if (error.errors && typeof error.errors === 'object') {
+          const firstKey = Object.keys(error.errors)[0];
+          const errorsVal = error.errors[firstKey];
+          if (Array.isArray(errorsVal) && errorsVal.length > 0) {
+            errorMessage = errorsVal[0];
+          } else if (typeof errorsVal === 'string') {
+            errorMessage = errorsVal;
+          } else {
+            errorMessage = error.message || 'Validation error';
+          }
+        } else {
+          errorMessage = error.message || error.error || 'Failed to process job request';
+        }
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+      });
     } finally {
       setLoading(false);
     }

@@ -59,7 +59,7 @@ const CandidateProfileCard: React.FC<CandidateProfileCardProps> = ({ applicant }
         </View>
 
         {/* Match Circular Indicator */}
-        <View style={styles.matchCircleContainer}>
+        {/* <View style={styles.matchCircleContainer}>
           <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
             <Svg width={size} height={size} style={{ position: 'absolute' }}>
               <Circle
@@ -90,7 +90,7 @@ const CandidateProfileCard: React.FC<CandidateProfileCardProps> = ({ applicant }
               <Text style={styles.matchScoreLbl}>Match</Text>
             </View>
           </View>
-        </View>
+        </View> */}
       </View>
 
       <View style={styles.divider} />

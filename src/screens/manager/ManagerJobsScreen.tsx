@@ -11,8 +11,9 @@ import MainManagerHeader from '../../components/Manager_component/MainManagerHea
 import ActiveJobCard from '../../components/Manager_component/ActiveJobCard';
 import FilterModal, { FilterSection } from '../../components/Manager_component/FilterModal';
 
-import { getCompanyJobs } from '../../api/CompanyHomeProvider';
+import { getCompanyJobs, getCompanyProfile } from '../../api/CompanyHomeProvider';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
+import Toast from 'react-native-toast-message';
 
 const TABS = ['Active', 'Closed', 'Draft', 'Expired'];
 
@@ -51,6 +52,7 @@ const ManagerJobsScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [lastPage, setLastPage] = useState(1);
   const [totalJobs, setTotalJobs] = useState(0);
+  const [companyProfile, setCompanyProfile] = useState<any>(null);
 
   const fetchJobs = async (pageNum: number, isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -68,17 +70,68 @@ const ManagerJobsScreen = ({ navigation }: any) => {
     }
   };
 
+  const fetchCompanyProfile = async () => {
+    try {
+      const res = await getCompanyProfile();
+      console.log('getCompanyProfile response in jobs screen:', res);
+      if (res?.company) {
+        setCompanyProfile(res.company);
+      }
+    } catch (error) {
+      console.log('Error fetching company profile in jobs screen:', error);
+    }
+  };
+
   useEffect(() => {
     fetchJobs(page);
   }, [page]);
 
   useEffect(() => {
+    fetchCompanyProfile();
     const unsubscribe = navigation.addListener('focus', () => {
       fetchJobs(1);
+      fetchCompanyProfile();
       setPage(1);
     });
     return unsubscribe;
   }, [navigation]);
+
+  const handlePostJobPress = () => {
+    if (!companyProfile) {
+      Toast.show({
+        type: 'error',
+        text1: 'Loading Profile',
+        text2: 'Loading profile details. Please try again in a moment.',
+      });
+      return;
+    }
+
+    const companyPackages = companyProfile?.company_packages || [];
+    const activePackageObj = companyPackages.find((p: any) => p.status === 'active');
+
+    if (!activePackageObj) {
+      Toast.show({
+        type: 'error',
+        text1: 'Purchase Required',
+        text2: 'Please purchase package',
+      });
+      return;
+    }
+
+    const used = Number(activePackageObj.used_job_posts || 0);
+    const total = Number(activePackageObj.package?.no_of_job_post || 0);
+
+    if (total > 0 && used >= total) {
+      Toast.show({
+        type: 'error',
+        text1: 'Limit Exceeded',
+        text2: `Job post limit exceeded. Used: ${used}/${total}`,
+      });
+      return;
+    }
+
+    navigation.navigate('PostJob');
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -123,7 +176,7 @@ const ManagerJobsScreen = ({ navigation }: any) => {
         rightComponent={
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => navigation.navigate('PostJob')}
+            onPress={handlePostJobPress}
           >
             <Plus color={Colors.white} size={RFValue(12)} strokeWidth={2.5} />
           </TouchableOpacity>

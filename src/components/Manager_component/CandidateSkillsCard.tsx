@@ -9,14 +9,11 @@ interface CandidateSkillsCardProps {
   skills?: string[];
 }
 
-const defaultSkills = [
-  'React Native', 'TypeScript', 'Redux', 'Expo', 'Framer Motion', 
-  'React Navigation', 'Redux Toolkit', 'Zustand', 'Tailwind CSS', 
-  'Styled Components', 'React Testing Library', 'Jest', 'ESLint', 
-  'Prettier', 'Git'
-];
 
-const CandidateSkillsCard: React.FC<CandidateSkillsCardProps> = ({ skills = defaultSkills }) => {
+
+const CandidateSkillsCard: React.FC<CandidateSkillsCardProps> = ({ skills }) => {
+  const hasSkills = skills && skills.length > 0;
+
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeaderRow}>
@@ -26,13 +23,17 @@ const CandidateSkillsCard: React.FC<CandidateSkillsCardProps> = ({ skills = defa
         </View>
       </View>
 
-      <View style={styles.skillsWrapper}>
-        {skills.map((skill: string) => (
-          <View key={skill} style={styles.skillOutlineChip}>
-            <Text style={styles.skillOutlineChipText}>{skill}</Text>
-          </View>
-        ))}
-      </View>
+      {hasSkills ? (
+        <View style={styles.skillsWrapper}>
+          {skills.map((skill: string) => (
+            <View key={skill} style={styles.skillOutlineChip}>
+              <Text style={styles.skillOutlineChipText}>{skill}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.noDataText}>No data available</Text>
+      )}
     </View>
   );
 };
@@ -79,6 +80,12 @@ const styles = StyleSheet.create({
     fontSize: RFValue(8.2),
     color: Colors.textPrimary,
     fontWeight: '600',
+  },
+  noDataText: {
+    fontSize: RFValue(8.5),
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    paddingVertical: hp('0.5%'),
   },
 });
 
