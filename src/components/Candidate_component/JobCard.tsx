@@ -64,7 +64,7 @@ const JobCard: React.FC<JobCardProps> = ({
           )}
           {!!salary && (
             <View style={styles.tag}>
-              <IndianRupee color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} />
+              {/* <IndianRupee color={Colors.textTertiary} size={RFValue(8)} strokeWidth={2} /> */}
               <Text style={styles.tagText}>{salary}</Text>
             </View>
           )}

@@ -58,7 +58,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
     return (rawJobs || []).slice(0, 10).map((job: any) => normalizeBackendJob(job));
   }, [rawJobs]);
 
-   const loadUser = async () => {
+  const loadUser = async () => {
     try {
       const data = await AsyncStorage.getItem('userData');
       if (data) setUser(JSON.parse(data));
@@ -102,10 +102,9 @@ const CandidateHomeScreen = ({ navigation }: any) => {
 
   const completeness = getCandidateProfileCompleteness(user || candidateProfile);
   const completionPercent = completeness.percentage;
-
   const dashboardStats = [
     { label: 'Profile', value: `${completionPercent}%`, icon: TrendingUp, color: Colors.primary },
-    { label: 'Applied', value: `${appliedJobs.length}`, icon: FileText, color: Colors.info },
+    { label: 'Applied', value: `${user?.candidate.applied_jobs_count || 0}`, icon: FileText, color: Colors.info },
     { label: 'Views', value: `${candidateProfile.profileViews}`, icon: Users, color: Colors.success },
     { label: 'Invites', value: `${recentInvites.length}`, icon: Bell, color: Colors.warning },
   ];

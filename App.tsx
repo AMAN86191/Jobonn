@@ -12,12 +12,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { logAppOpen } from './src/services/firebase/analytics'
 import { crashTest } from './src/services/firebase/crashlytics'
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const App = () => {
   const { isRestartRequired, newReleaseBundle } = useStallionUpdate()
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [isDownloading, setIsDownloading] = useState(false)
-
   useEffect(() => {
     crashTest()
     logAppOpen();
@@ -25,7 +24,7 @@ const App = () => {
 
   useEffect(() => {
     const subscription: any = addEventListener((event: any) => {
-      if (event.type === 'DOWNLOAD_STARTED') { 
+      if (event.type === 'DOWNLOAD_STARTED') {
         setIsDownloading(true)
         setDownloadProgress(0)
       } else if (event.type === 'DOWNLOAD_PROGRESS_PROD') {

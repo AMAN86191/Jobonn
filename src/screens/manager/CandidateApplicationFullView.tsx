@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {
   widthPercentageToDP as wp,
@@ -47,6 +48,8 @@ import CandidateSkillsCard from '../../components/Manager_component/CandidateSki
 import ScheduleInterviewModal from '../../components/Manager_component/ScheduleInterviewModal';
 import SearchableDropdown from '../../components/forms/SearchableDropdown';
 import { contactCredits } from '../../data/jobonnStaticData';
+import { getAppliedCandidateDetail } from '../../api/CompanyHomeProvider';
+import { normalizeCandidateProfile } from '../../utils/candidateProfileUtils';
 
 const JOBS_LIST = [
   'Senior React Native Developer',
@@ -67,6 +70,119 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
   const [contactUnlocked, setContactUnlocked] = useState(!!applicant?.contactUnlocked);
   const [creditsRemaining, setCreditsRemaining] = useState(contactCredits.remaining);
 
+  const [detailData, setDetailData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDetail = async () => {
+      if (!applicant?.candidate_id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const res = await getAppliedCandidateDetail(applicant.candidate_id);
+        console.log('getAppliedCandidateDetail response:', res);
+        if (res?.status && res?.candidate) {
+          const { normalizedProfile, normalizedPersonalDetails } = normalizeCandidateProfile(res.candidate);
+          setDetailData({
+            ...res.candidate,
+            normalizedProfile,
+            normalizedPersonalDetails,
+            applications: res.applications || []
+          });
+        }
+      } catch (error) {
+        console.log('Error fetching candidate detail:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [applicant?.candidate_id]);
+
+  const isFresher = (exp: string) => {
+    if (!exp) return true;
+    const lowercaseExp = exp.toLowerCase();
+    if (lowercaseExp.includes('fresher')) return true;
+    if (lowercaseExp.includes('0 years') || lowercaseExp.includes('0 yrs')) {
+      if (lowercaseExp.includes('0 months') || lowercaseExp.includes('0 mos') || !lowercaseExp.includes('month')) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const displayApplicant = useMemo(() => {
+    if (!detailData) {
+      return {
+        ...applicant,
+        experience: applicant.experience || '',
+        currentCTC: applicant.currentCTC || 'Not Disclosed',
+        expectedCTC: applicant.expectedCTC || 'Not Disclosed',
+        noticePeriod: applicant.noticePeriod || '',
+        preferredLocation: applicant.preferredLocation || applicant.location || 'Not Specified',
+        jobType: applicant.jobType || applicant.preferred_job_types || 'Not Specified',
+        preferredShift: applicant.preferredShift || 'Not Specified',
+        skills: [],
+        languages: [],
+        education: [],
+        experiences: [],
+        summary: '',
+        gender: 'Not Specified',
+        dob: 'Not Specified',
+        hometown: 'Not Specified',
+        maritalStatus: 'Not Specified',
+        profile_image: '',
+        answers: [],
+      };
+    }
+    const prof = detailData.normalizedProfile || {};
+    const personal = detailData.normalizedPersonalDetails || {};
+    const apps = detailData.applications || [];
+    const answers = apps.length > 0 ? (apps[0].answers || []) : [];
+
+    const displayExp = prof.totalExperience || applicant.experience || 'Fresher';
+
+    return {
+      ...applicant,
+      name: detailData.user?.name || detailData.name || applicant.name || '',
+      role: prof.jobTitle || applicant.role || '',
+      experience: displayExp,
+      location: prof.currentLocation || applicant.location || '',
+      currentCTC: (prof.currentCTC && prof.currentCTC !== 'null') ? (String(prof.currentCTC).toLowerCase().includes('lpa') ? prof.currentCTC : `${prof.currentCTC} LPA`) : (applicant.currentCTC || 'Not Disclosed'),
+      expectedCTC: (prof.expectedCTC && prof.expectedCTC !== 'null') ? prof.expectedCTC : (applicant.expectedCTC || 'Not Disclosed'),
+      noticePeriod: prof.noticePeriod || applicant.noticePeriod || '',
+      preferredLocation: prof.preferredLocation || applicant.preferredLocation || applicant.location || 'Not Specified',
+      jobType: prof.jobType || applicant.jobType || applicant.preferred_job_types || 'Not Specified',
+      preferredShift: prof.preferredShift || applicant.preferredShift || 'Not Specified',
+      skills: prof.skills || [],
+      languages: prof.languages || [],
+      education: prof.education || [],
+      experiences: prof.experiences || [],
+      summary: prof.summary || '',
+      gender: personal.gender || 'Not Specified',
+      dob: personal.date_of_birth || 'Not Specified',
+      hometown: personal.current_address || 'Not Specified',
+      maritalStatus: personal.status || 'Not Specified',
+      profile_image: prof.profile_image || '',
+      resume: prof.resume || '',
+      answers: answers,
+    };
+  }, [applicant, detailData]);
+  console.log('displayApplicant', displayApplicant)
+  const hometownVal = useMemo(() => {
+    if (!detailData?.personal_detail) {
+      return displayApplicant.hometown || '-';
+    }
+    const city = detailData.personal_detail.city || '';
+    const state = detailData.personal_detail.state || '';
+    if (city && state) {
+      return `${city}, ${state}`;
+    }
+    return city || state || '-';
+  }, [detailData, displayApplicant.hometown]);
+
   const handleSendInvite = () => {
     if (!selectedJob) {
       Alert.alert('Required', 'Please select a job post.');
@@ -75,22 +191,41 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
     setInviteModalVisible(false);
     Alert.alert(
       'Success',
-      `Invitation sent to ${applicant.name} for the post of ${selectedJob}!`
+      `Invitation sent to ${displayApplicant.name} for the post of ${selectedJob}!`
     );
     setSelectedJob('');
   };
 
   if (!applicant) return null;
 
-  const displayNoticePeriod = applicant.noticePeriod || '15 Days';
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" />
+        <CommanManagerHeader
+          navigation={navigation}
+          title="Application Details"
+        />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FC' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const displayNoticePeriod = displayApplicant.noticePeriod || '';
   const handleUnlockContact = () => {
     if (contactUnlocked) return;
     setCreditsRemaining(prev => Math.max(prev - contactCredits.costPerUnlock, 0));
     setContactUnlocked(true);
-    Alert.alert('Contact unlocked', `${applicant.name}'s mobile, email and WhatsApp details are now visible.`);
+    Alert.alert('Contact unlocked', `${displayApplicant.name}'s mobile, email and WhatsApp details are now visible.`);
   };
 
-  const displayedSkills = ['React Native', 'TypeScript', 'Redux', 'Expo', 'Framer Motion', 'React Navigation', 'Redux Toolkit', 'Zustand', 'Tailwind CSS', 'Styled Components', 'React Testing Library', 'Jest', 'ESLint', 'Prettier', 'Git'];
+  const resumeUrl = displayApplicant.resume
+    ? (displayApplicant.resume.startsWith('http')
+      ? displayApplicant.resume
+      : `https://admin.jobonn.in/storage/${displayApplicant.resume}`)
+    : '';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -111,14 +246,14 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
           contentContainerStyle={styles.content}
         >
           {/* Profile Card */}
-          <CandidateProfileCard applicant={applicant} />
+          <CandidateProfileCard applicant={displayApplicant} />
 
           {contactUnlocked ? (
             <CandidateActionsBar
-              emailAddress={applicant.emailAddress || 'candidate@example.com'}
-              phoneNumber={applicant.phoneNumber || '+91 98765 43210'}
-              whatsappNumber={applicant.whatsappNumber || '+91 98765 43210'}
-              resumeUrl="https://example.com/resume.pdf"
+              emailAddress={detailData?.user?.email || displayApplicant.emailAddress || ''}
+              phoneNumber={detailData?.user?.phone || displayApplicant.phoneNumber || ''}
+              whatsappNumber={detailData?.user?.phone || displayApplicant.whatsappNumber || ''}
+              resumeUrl={resumeUrl}
             />
           ) : (
             <RAnimated.View entering={FadeInDown.duration(400).delay(180)} style={styles.unlockCard}>
@@ -141,8 +276,6 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             </RAnimated.View>
           )}
 
-
-
           {/* Profile Summary Card */}
           <RAnimated.View entering={FadeInDown.duration(400).delay(260)} style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
@@ -152,7 +285,7 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               </View>
             </View>
             <Text style={styles.summaryText}>
-              A highly motivated developer with 4+ years of experience in building scalable cross-platform mobile applications. Proven ability to integrate complex backend services, improve app performance, and deliver premium UI/UX experiences.
+              {displayApplicant.summary || ''}
             </Text>
           </RAnimated.View>
 
@@ -167,22 +300,26 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             <View style={styles.careerGridRow}>
               <View style={styles.careerGridCell}>
                 <Text style={styles.detailsGridLabel}>Preferred Location</Text>
-                <Text style={styles.detailsGridVal}>{applicant.preferredLocation || applicant.location || 'Bangalore, Remote'}</Text>
+                <Text style={styles.detailsGridVal}>{displayApplicant.preferredLocation || displayApplicant.location || '-'}</Text>
               </View>
               <View style={styles.careerGridCell}>
                 <Text style={styles.detailsGridLabel}>Job Type</Text>
-                <Text style={styles.detailsGridVal}>{applicant.jobType || 'Full-Time'}</Text>
+                <Text style={styles.detailsGridVal}>{displayApplicant.jobType || '-'}</Text>
               </View>
               <View style={styles.careerGridCell}>
                 <Text style={styles.detailsGridLabel}>Preferred Shift</Text>
-                <Text style={styles.detailsGridVal}>{applicant.preferredShift || 'Day Shift'}</Text>
+                <Text style={styles.detailsGridVal}>{displayApplicant.preferredShift || '-'}</Text>
               </View>
             </View>
             <View style={[styles.careerGridRow, { marginTop: hp('1.5%') }]}>
-              <View style={styles.careerGridCell}>
-                <Text style={styles.detailsGridLabel}>Expected CTC</Text>
-                <Text style={styles.detailsGridVal}>{applicant.expectedCTC || '22 LPA'}</Text>
-              </View>
+              {displayApplicant.experience?.toLowerCase() !== 'fresher' ? (
+                <View style={styles.careerGridCell}>
+                  <Text style={styles.detailsGridLabel}>Expected CTC</Text>
+                  <Text style={styles.detailsGridVal}>{displayApplicant.expectedCTC || '-'}</Text>
+                </View>
+              ) : (
+                <View style={styles.careerGridCell} />
+              )}
               <View style={styles.careerGridCell}>
                 <Text style={styles.detailsGridLabel}>Availability</Text>
                 <Text style={styles.detailsGridVal}>{displayNoticePeriod}</Text>
@@ -192,13 +329,13 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
           </RAnimated.View>
 
           {/* Key Skills Section Card */}
-          <CandidateSkillsCard skills={displayedSkills} />
+          <CandidateSkillsCard skills={displayApplicant.skills.length > 0 ? displayApplicant.skills : undefined} />
 
           {/* Work Experience Section Card */}
-          <CandidateWorkExperience />
+          <CandidateWorkExperience experiences={displayApplicant.experiences} />
 
           {/* Education Section Card */}
-          <CandidateEducationCard />
+          <CandidateEducationCard educations={displayApplicant.education} />
 
           {/* Languages Card */}
           <RAnimated.View entering={FadeInDown.duration(400).delay(300)} style={styles.sectionCard}>
@@ -209,12 +346,17 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               </View>
             </View>
             <View style={styles.languageContainer}>
-              <View style={styles.languageBadge}>
-                <Text style={styles.languageText}>English (Professional)</Text>
-              </View>
-              <View style={styles.languageBadge}>
-                <Text style={styles.languageText}>Hindi (Native)</Text>
-              </View>
+              {displayApplicant.languages && displayApplicant.languages.length > 0 ? (
+                displayApplicant.languages.map((lang: any, i: number) => (
+                  <View key={i} style={styles.languageBadge}>
+                    <Text style={styles.languageText}>
+                      {typeof lang === 'string' ? lang : `${lang.name || lang.language_name} (${lang.level || lang.proficiency})`}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.languageText}>English (Professional), Hindi (Native)</Text>
+              )}
             </View>
           </RAnimated.View>
 
@@ -231,14 +373,14 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
                 <View style={styles.iconLabelRow}>
                   <User size={RFValue(8.5)} color={Colors.textSecondary} />
                   <Text style={styles.detailsGridLabelIcon}>Gender</Text>
-                  <Text style={styles.detailsGridVal}>Male</Text>
+                  <Text style={styles.detailsGridVal}>{displayApplicant.gender || '-'}</Text>
                 </View>
               </View>
               <View style={styles.detailsGridCell}>
                 <View style={styles.iconLabelRow}>
                   <Calendar size={RFValue(8.5)} color={Colors.textSecondary} />
                   <Text style={styles.detailsGridLabelIcon}>Date of Birth</Text>
-                  <Text style={styles.detailsGridVal}>14 Aug 1996</Text>
+                  <Text style={styles.detailsGridVal}>{displayApplicant.dob || '-'}</Text>
                 </View>
               </View>
             </View>
@@ -246,22 +388,43 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               <View style={styles.detailsGridCell}>
                 <View style={styles.iconLabelRow}>
                   <MapPin size={RFValue(8.5)} color={Colors.textSecondary} />
-
                   <Text style={styles.detailsGridLabelIcon}>Hometown</Text>
-                  <Text style={styles.detailsGridVal}>Delhi, India</Text>
+                  <Text style={styles.detailsGridVal}>{hometownVal || '-'}</Text>
                 </View>
               </View>
               <View style={styles.detailsGridCell}>
                 <View style={styles.iconLabelRow}>
                   <User size={RFValue(8.5)} color={Colors.textSecondary} />
-
                   <Text style={styles.detailsGridLabelIcon}>Marital Status</Text>
-                  <Text style={styles.detailsGridVal}>Single</Text>
+                  <Text style={styles.detailsGridVal}>{displayApplicant.maritalStatus || '-'}</Text>
                 </View>
               </View>
             </View>
-
           </RAnimated.View>
+
+          {/* Screening Questions Card */}
+          {displayApplicant.answers && displayApplicant.answers.length > 0 && (
+            <RAnimated.View entering={FadeInDown.duration(400).delay(345)} style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionHeaderLeft}>
+                  <FileText size={RFValue(11)} color={Colors.primary} />
+                  <Text style={styles.sectionCardTitle}>Screening Questions</Text>
+                </View>
+              </View>
+              <View style={{ gap: hp('1.5%') }}>
+                {displayApplicant.answers.map((ans: any, index: number) => (
+                  <View key={index} style={styles.qaContainer}>
+                    <Text style={styles.questionText}>
+                      Q{index + 1}: {ans.question?.question || 'Question'}
+                    </Text>
+                    <Text style={styles.answerText}>
+                      Ans: {ans.answer || 'No answer provided'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </RAnimated.View>
+          )}
 
           {/* Internal Manager Notes Input */}
           <RAnimated.View
@@ -771,6 +934,25 @@ const styles = StyleSheet.create({
     fontSize: RFValue(9.2),
     color: Colors.white,
     fontWeight: '800',
+  },
+  qaContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: wp('3%'),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  questionText: {
+    fontSize: RFValue(9),
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: hp('0.5%'),
+  },
+  answerText: {
+    fontSize: RFValue(8.5),
+    fontWeight: '500',
+    color: Colors.textSecondary,
+    lineHeight: RFValue(11.5),
   },
 });
 

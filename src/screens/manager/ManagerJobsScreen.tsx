@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, TextInput, Pressable, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, TextInput, Pressable, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { Search, SlidersHorizontal, Plus, ArrowLeft, ArrowRight } from 'lucide-react-native';
@@ -11,11 +11,10 @@ import MainManagerHeader from '../../components/Manager_component/MainManagerHea
 import ActiveJobCard from '../../components/Manager_component/ActiveJobCard';
 import FilterModal, { FilterSection } from '../../components/Manager_component/FilterModal';
 
-import { useDispatch, useSelector } from 'react-redux';
-import { getCompanyJobsSlice } from '../../redux/CompanyHomeSlice';
+import { getCompanyJobs } from '../../api/CompanyHomeProvider';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
 
-const TABS = ['Active', 'Closed'];
+const TABS = ['Active', 'Closed', 'Draft', 'Expired'];
 
 const FILTER_SECTIONS: FilterSection[] = [
   {
@@ -41,26 +40,51 @@ const FILTER_SECTIONS: FilterSection[] = [
 ];
 
 const ManagerJobsScreen = ({ navigation }: any) => {
-  const dispatch = useDispatch();
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState('Active');
   const [search, setSearch] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { jobs: rawJobs, loading, lastPage } = useSelector((state: any) => state.companyHome);
+  const [rawJobs, setRawJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [lastPage, setLastPage] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
+
+  const fetchJobs = async (pageNum: number, isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    try {
+      const res = await getCompanyJobs(pageNum);
+      console.log('getCompanyJobs response:', res);
+      const list = res?.jobs?.data || [];
+      setRawJobs(list);
+      setLastPage(res?.jobs?.last_page || 1);
+      setTotalJobs(res?.jobs?.total || 0);
+    } catch (error) {
+      console.log('Error fetching company jobs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    dispatch(getCompanyJobsSlice(page) as any);
-  }, [dispatch, page]);
+    fetchJobs(page);
+  }, [page]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      dispatch(getCompanyJobsSlice(1) as any);
+      fetchJobs(1);
       setPage(1);
     });
     return unsubscribe;
-  }, [navigation, dispatch]);
+  }, [navigation]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchJobs(page, true);
+    setRefreshing(false);
+  };
 
   const normalizedJobs = useMemo(() => {
     return (rawJobs || []).map((job: any) => normalizeBackendJob(job));
@@ -87,6 +111,7 @@ const ManagerJobsScreen = ({ navigation }: any) => {
       return { ...prev, [section]: updated };
     });
   };
+  console.log('job filtered', filtered)
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -133,7 +158,18 @@ const ManagerJobsScreen = ({ navigation }: any) => {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         {loading && normalizedJobs.length === 0 ? (
           <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('3%') }} />
         ) : filtered.length > 0 ? (

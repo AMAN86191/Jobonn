@@ -5,7 +5,11 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import { GraduationCap } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 
-const CandidateEducationCard: React.FC = () => {
+interface CandidateEducationCardProps {
+  educations?: any[];
+}
+
+const CandidateEducationCard: React.FC<CandidateEducationCardProps> = ({ educations = [] }) => {
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeaderRow}>
@@ -15,15 +19,34 @@ const CandidateEducationCard: React.FC = () => {
         </View>
       </View>
 
-      <View style={styles.eduItemRow}>
-    
+      {educations.length === 0 ? (
+        <Text style={styles.eduDescription}>No education details added.</Text>
+      ) : (
+        educations.map((edu: any, index: number) => {
+          const degree = edu.degree || edu.highest_qualification || 'Degree';
+          const institution = edu.school || edu.institute_name || '';
+          const dateRange = edu.startDate && edu.endDate && edu.startDate !== edu.endDate
+            ? `${edu.startDate} - ${edu.endDate}`
+            : (edu.endDate || edu.startDate || '');
+          const gpaText = edu.gpa
+            ? (edu.gpa.toLowerCase().includes('cgpa') || edu.gpa.includes('%') ? edu.gpa : `CGPA: ${edu.gpa}`)
+            : '';
 
-        <View style={styles.eduContentBlock}>
-          <Text style={styles.eduDegreeTitle}>Bachelor of Technology (Computer Science)</Text>
-          <Text style={styles.eduInstitution}>IIT Delhi • 2015 - 2019</Text>
-          <Text style={styles.eduDescription}>Graduated with 8.5 CGPA. Specialized in Mobile Computing.</Text>
-        </View>
-      </View>
+          return (
+            <View key={index} style={[styles.eduItemRow, index > 0 && { marginTop: hp('1.5%') }]}>
+              <View style={styles.eduContentBlock}>
+                <Text style={styles.eduDegreeTitle}>{degree}</Text>
+                <Text style={styles.eduInstitution}>
+                  {institution}{dateRange ? ` • ${dateRange}` : ''}
+                </Text>
+                {gpaText ? (
+                  <Text style={styles.eduDescription}>{gpaText}</Text>
+                ) : null}
+              </View>
+            </View>
+          );
+        })
+      )}
     </View>
   );
 };

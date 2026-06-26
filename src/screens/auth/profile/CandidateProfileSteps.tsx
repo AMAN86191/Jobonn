@@ -289,7 +289,7 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
       if (!formData.noticePeriod) newErrors.noticePeriod = 'Notice Period is required';
     } else if (currentStep === 3) {
       if (!formData.qualification) newErrors.qualification = 'Highest Qualification is required';
-      if (!formData.college) newErrors.college = 'College Name is required';
+   
       if (!formData.passingYear) newErrors.passingYear = 'Passing Year is required';
       if (!formData.percentage) newErrors.percentage = 'Percentage/CGPA is required';
     } else if (currentStep === 4) {
