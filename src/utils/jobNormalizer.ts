@@ -1,6 +1,5 @@
 export const normalizeBackendJob = (job: any): any => {
   if (!job) return null;
- console.log('job', job)
   // location string joining
   let locationStr = '';
   if (job.locations && Array.isArray(job.locations) && job.locations.length > 0) {
@@ -111,7 +110,6 @@ export const normalizeBackendJob = (job: any): any => {
   // Get posted time diff or custom string
   let postedStr = '';
   if (job.created_at) {
-    console.log('created_at', job.created_at);
     try {
       const createdDate = new Date(job.created_at);
       const diffMs = Math.max(0, Date.now() - createdDate.getTime());

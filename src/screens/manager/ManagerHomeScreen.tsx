@@ -22,24 +22,24 @@ import { recruiterProfile, jobs, talentDatabase, managedCompanies, packages, con
 import ProfileCompletenessBanner from '../../components/Manager_component/ProfileCompletenessBanner';
 
 import { useDispatch, useSelector } from 'react-redux';
-import { getCompanyJobsSlice } from '../../redux/CompanyHomeSlice';
+import { getCompanyJobsSlice, getCompanyProfileSlice } from '../../redux/CompanyHomeSlice';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
+import Toast from 'react-native-toast-message';
 
-const STATS = [
-  { id: '1', title: 'Active Jobs', value: `${recruiterProfile.stats.postedJobs}`, icon: Briefcase, color: Colors.primary, subtitle: '+2 this week' },
-  { id: '2', title: 'Applicants', value: `${recruiterProfile.stats.totalApplicants}`, icon: Users, color: Colors.info, subtitle: '+34 today' },
-  { id: '3', title: 'Interviews', value: '18', icon: Calendar, color: Colors.success, subtitle: 'Scheduled' },
-];
 
-const activePackage = packages.find(item => item.active);
 
 const ManagerHomeScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const [user, setUser] = useState<any>(null);
   const [page, setPage] = useState(1);
+  const [companyProfile, setCompanyProfile] = useState<any>(null);
 
   const { jobs: rawJobs, loading, lastPage } = useSelector((state: any) => state.companyHome);
- console.log('jobs', jobs)
+const STATS = [
+  { id: '1', title: 'Active Jobs', value: `${jobs.length}`, icon: Briefcase, color: Colors.primary, subtitle: '+2 this week' },
+  { id: '2', title: 'Applicants', value: `${recruiterProfile.stats.totalApplicants}`, icon: Users, color: Colors.info, subtitle: '+34 today' },
+  { id: '3', title: 'Interviews', value: '18', icon: Calendar, color: Colors.success, subtitle: 'Scheduled' },
+];
   useEffect(() => {
     dispatch(getCompanyJobsSlice(page) as any);
   }, [dispatch, page]);
@@ -48,10 +48,62 @@ const ManagerHomeScreen = ({ navigation }: any) => {
     return (rawJobs || []).map((job: any) => normalizeBackendJob(job));
   }, [rawJobs]);
 
+  const activeCompanyPackage = useMemo(() => {
+    if (!companyProfile?.company_packages || !Array.isArray(companyProfile.company_packages)) return null;
+    return companyProfile.company_packages.find((p: any) => p.status === 'active');
+  }, [companyProfile]);
+
   const loadUser = async () => {
     const data = await AsyncStorage.getItem('userData');
-    console.log('data', data);
+    console.log('data', JSON.parse(data as any));
     if (data) setUser(JSON.parse(data));
+
+    try {
+      const profile = await dispatch(getCompanyProfileSlice() as any).unwrap();
+      console.log('Company Profile Response:', profile);
+      if (profile && profile.company) {
+        setCompanyProfile(profile.company);
+      }
+    } catch (error) {
+      console.log('Error fetching company profile:', error);
+    }
+  };
+
+  const handlePostJobPress = () => {
+    if (!companyProfile) {
+      Toast.show({
+        type: 'error',
+        text1: 'Loading Profile',
+        text2: 'Loading profile details. Please try again in a moment.',
+      });
+      return;
+    }
+
+    const companyPackages = companyProfile?.company_packages || [];
+    const activePackageObj = companyPackages.find((p: any) => p.status === 'active');
+
+    if (!activePackageObj) {
+      Toast.show({
+        type: 'error',
+        text1: 'Purchase Required',
+        text2: 'Please purchase package',
+      });
+      return;
+    }
+
+    const used = Number(activePackageObj.used_job_posts || 0);
+    const total = Number(activePackageObj.package?.no_of_job_post || 0);
+
+    if (total > 0 && used >= total) {
+      Toast.show({
+        type: 'error',
+        text1: 'Limit Exceeded',
+        text2: `Job post limit exceeded. Used: ${used}/${total}`,
+      });
+      return;
+    }
+
+    navigation.navigate('PostJob');
   };
 
   useEffect(() => {
@@ -75,9 +127,9 @@ const ManagerHomeScreen = ({ navigation }: any) => {
       >
         <ManagerHeader onNotifPress={() => navigation.navigate('ManagerNotifications')} />
 
-        <PostJobBanner onPress={() => navigation.navigate('PostJob')} />
+        <PostJobBanner onPress={handlePostJobPress} />
 
-        <View style={styles.companySwitcherCard}>
+        {/* <View style={styles.companySwitcherCard}>
           <View style={styles.companySwitcherHeader}>
             <View style={styles.companySwitcherTitleRow}>
               <Building2 size={RFValue(12)} color={Colors.primary} />
@@ -93,13 +145,17 @@ const ManagerHomeScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
+        </View> */}
 
         <View style={styles.controlGrid}>
           <TouchableOpacity style={styles.controlCard} onPress={() => navigation.navigate('PackageManagement')}>
             <CreditCard size={RFValue(13)} color={Colors.primary} />
-            <Text style={styles.controlValue}>{activePackage?.name || 'No Package'}</Text>
-            <Text style={styles.controlLabel}>{contactCredits.remaining} unlock credits</Text>
+            <Text style={styles.controlValue}>{activeCompanyPackage?.package?.package_name || 'No Package'}</Text>
+            <Text style={styles.controlLabel}>
+              {activeCompanyPackage
+                ? `${activeCompanyPackage.used_job_posts || 0} / ${activeCompanyPackage.package?.no_of_job_post || 0} job posts`
+                : 'Purchase to unlock posting'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.controlCard} onPress={() => navigation.navigate('AuditLogs')}>
             <FileClock size={RFValue(13)} color={Colors.warning} />

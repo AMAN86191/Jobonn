@@ -110,18 +110,47 @@ const PackageManagementScreen = ({ navigation }: any) => {
     try {
       const response = await dispatch(packagePurchaseSlice(payload) as any).unwrap();
       console.log('response', response);
+      if (response && (response.status === false || (response.status_code && response.status_code !== 200 && response.status_code !== 201 && response.status_code !== '200' && response.status_code !== '201'))) {
+        const message = response.message || 'Failed to purchase package';
+        Toast.show({
+          type: 'error',
+          text1: 'Purchase Failed',
+          text2: message,
+        });
+        return;
+      }
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'Package purchased successfully!',
+        text2: response?.message || 'Package purchased successfully!',
       });
       fetchPackages();
-    } catch (error) {
+    } catch (error: any) {
       console.log('error', error);
+      let errorMessage = 'Something went wrong';
+
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        if (error.errors && typeof error.errors === 'object') {
+          const firstKey = Object.keys(error.errors)[0];
+          const errorsVal = error.errors[firstKey];
+          if (Array.isArray(errorsVal) && errorsVal.length > 0) {
+            errorMessage = errorsVal[0];
+          } else if (typeof errorsVal === 'string') {
+            errorMessage = errorsVal;
+          } else {
+            errorMessage = error.message || 'Validation error';
+          }
+        } else {
+          errorMessage = error.message || error.error || 'Something went wrong';
+        }
+      }
+
       Toast.show({
         type: 'error',
         text1: 'Purchase Failed',
-        text2: typeof error === 'string' ? error : 'Something went wrong',
+        text2: errorMessage,
       });
     }
   };
@@ -169,17 +198,31 @@ const PackageManagementScreen = ({ navigation }: any) => {
 
   const renewalDate = formatRenewalDate(currentPlan?.expiry_date || currentPlan?.expires_at);
 
-  const jobsTotal = activePackage?.no_of_job_post || 10;
-  const jobsUsed = Math.min(6, jobsTotal);
+  const jobsTotal = activePackage?.no_of_job_post || 0;
+  const jobsUsed = currentPlan?.used_job_posts || 0;
 
-  const locationsTotal = activePackage?.no_of_location || 5;
-  const locationsUsed = Math.min(2, locationsTotal);
+  const locationsTotal = activePackage?.no_of_location || 0;
+  const locationsUsed = currentPlan?.used_locations || 0;
 
-  const usersTotal = activePackage?.no_of_users || 10;
-  const usersUsed = Math.min(4, usersTotal);
+  const usersTotal = activePackage?.no_of_users || 0;
+  const usersUsed = currentPlan?.used_users || 0;
 
-  const profilesTotal = activePackage?.no_of_profile || 5;
-  const profilesUsed = Math.min(3, profilesTotal);
+  const profilesTotal = activePackage?.no_of_profile || 0;
+  const profilesUsed = currentPlan?.used_profile_views || 0;
+
+  const formatGridValue = (used: number, total: any) => {
+    if (total === null || total === undefined || total === -1 || total === 9999) {
+      return `${used} / Unlimited`;
+    }
+    return `${used} / ${total}`;
+  };
+
+  const getProgressPercentage = (used: number, total: any) => {
+    if (total === null || total === undefined || total === -1 || total === 9999 || total <= 0) {
+      return 0;
+    }
+    return Math.min(100, (used / total) * 100);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -261,34 +304,34 @@ const PackageManagementScreen = ({ navigation }: any) => {
                 <View style={styles.currentPlanGridIconCircle}>
                   <Briefcase size={RFValue(10)} color={Colors.white} />
                 </View>
-                <Text style={styles.currentPlanGridValue}>{jobsUsed} / {jobsTotal}</Text>
+                <Text style={styles.currentPlanGridValue}>{formatGridValue(jobsUsed, jobsTotal)}</Text>
                 <Text style={styles.currentPlanGridLabel}>Job Posts</Text>
                 <View style={styles.currentProgressTrack}>
-                  <View style={[styles.currentProgressFill, { width: `${(jobsUsed / jobsTotal) * 100}%` }]} />
+                  <View style={[styles.currentProgressFill, { width: `${getProgressPercentage(jobsUsed, jobsTotal)}%` }]} />
                 </View>
               </View>
 
               {/* Locations */}
-              <View style={styles.currentPlanGridCol}>
+              {/* <View style={styles.currentPlanGridCol}>
                 <View style={styles.currentPlanGridIconCircle}>
                   <MapPin size={RFValue(10)} color={Colors.white} />
                 </View>
-                <Text style={styles.currentPlanGridValue}>{locationsUsed} / {locationsTotal}</Text>
+                <Text style={styles.currentPlanGridValue}>{formatGridValue(locationsUsed, locationsTotal)}</Text>
                 <Text style={styles.currentPlanGridLabel}>Locations</Text>
                 <View style={styles.currentProgressTrack}>
-                  <View style={[styles.currentProgressFill, { width: `${(locationsUsed / locationsTotal) * 100}%` }]} />
+                  <View style={[styles.currentProgressFill, { width: `${getProgressPercentage(locationsUsed, locationsTotal)}%` }]} />
                 </View>
-              </View>
+              </View> */}
 
               {/* Users */}
               <View style={styles.currentPlanGridCol}>
                 <View style={styles.currentPlanGridIconCircle}>
                   <Users size={RFValue(10)} color={Colors.white} />
                 </View>
-                <Text style={styles.currentPlanGridValue}>{usersUsed} / {usersTotal}</Text>
+                <Text style={styles.currentPlanGridValue}>{formatGridValue(usersUsed, usersTotal)}</Text>
                 <Text style={styles.currentPlanGridLabel}>Users</Text>
                 <View style={styles.currentProgressTrack}>
-                  <View style={[styles.currentProgressFill, { width: `${(usersUsed / usersTotal) * 100}%` }]} />
+                  <View style={[styles.currentProgressFill, { width: `${getProgressPercentage(usersUsed, usersTotal)}%` }]} />
                 </View>
               </View>
 
@@ -297,10 +340,10 @@ const PackageManagementScreen = ({ navigation }: any) => {
                 <View style={styles.currentPlanGridIconCircle}>
                   <FileText size={RFValue(10)} color={Colors.white} />
                 </View>
-                <Text style={styles.currentPlanGridValue}>{profilesUsed} / {profilesTotal}</Text>
+                <Text style={styles.currentPlanGridValue}>{formatGridValue(profilesUsed, profilesTotal)}</Text>
                 <Text style={styles.currentPlanGridLabel}>Profiles</Text>
                 <View style={styles.currentProgressTrack}>
-                  <View style={[styles.currentProgressFill, { width: `${(profilesUsed / profilesTotal) * 100}%` }]} />
+                  <View style={[styles.currentProgressFill, { width: `${getProgressPercentage(profilesUsed, profilesTotal)}%` }]} />
                 </View>
               </View>
             </View>

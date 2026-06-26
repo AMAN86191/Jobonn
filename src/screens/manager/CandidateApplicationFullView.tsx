@@ -50,6 +50,9 @@ import SearchableDropdown from '../../components/forms/SearchableDropdown';
 import { contactCredits } from '../../data/jobonnStaticData';
 import { getAppliedCandidateDetail } from '../../api/CompanyHomeProvider';
 import { normalizeCandidateProfile } from '../../utils/candidateProfileUtils';
+import { useDispatch } from 'react-redux';
+import { unlockCandidateContactSlice } from '../../redux/CompanyHomeSlice';
+import Toast from 'react-native-toast-message';
 
 const JOBS_LIST = [
   'Senior React Native Developer',
@@ -61,6 +64,7 @@ const JOBS_LIST = [
 
 const CandidateApplicationFullView = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
+  const dispatch = useDispatch();
   const { applicant } = route.params || {};
   const [_status, setStatus] = useState(applicant?.status || 'New');
   const [noteContent, setNoteContent] = useState('');
@@ -91,6 +95,11 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             normalizedPersonalDetails,
             applications: res.applications || []
           });
+          if (res.is_viewed === true) {
+            setContactUnlocked(true);
+          } else {
+            setContactUnlocked(false);
+          }
         }
       } catch (error) {
         console.log('Error fetching candidate detail:', error);
@@ -214,11 +223,47 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
   }
 
   const displayNoticePeriod = displayApplicant.noticePeriod || '';
-  const handleUnlockContact = () => {
+  const handleUnlockContact = async () => {
     if (contactUnlocked) return;
-    setCreditsRemaining(prev => Math.max(prev - contactCredits.costPerUnlock, 0));
-    setContactUnlocked(true);
-    Alert.alert('Contact unlocked', `${displayApplicant.name}'s mobile, email and WhatsApp details are now visible.`);
+    const candidateId = displayApplicant.candidate_id || displayApplicant.id;
+    if (!candidateId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Candidate ID not found',
+      });
+      return;
+    }
+
+    try {
+      const response = await dispatch(unlockCandidateContactSlice({ candidate_id: candidateId }) as any).unwrap();
+      console.log('unlockCandidateContact response:', response);
+
+      if (response && (response.status === true || response.status_code === 200 || response.status_code === '200')) {
+        setCreditsRemaining(prev => Math.max(prev - contactCredits.costPerUnlock, 0));
+        setContactUnlocked(true);
+        // Alert.alert('Contact unlocked', `${displayApplicant.name}'s mobile, email and WhatsApp details are now visible.`);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Unlock Failed',
+          text2: response?.message || 'Failed to unlock contact',
+        });
+      }
+    } catch (error: any) {
+      console.log('Unlock contact error:', error);
+      let errorMsg = 'Failed to unlock contact';
+      if (typeof error === 'string') {
+        errorMsg = error;
+      } else if (error && typeof error === 'object') {
+        errorMsg = error.message || error.error || 'Failed to unlock contact';
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Unlock Failed',
+        text2: errorMsg,
+      });
+    }
   };
 
   const resumeUrl = displayApplicant.resume
@@ -267,8 +312,8 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
                 </View>
               </View>
               <View style={styles.creditRow}>
-                <CreditCard size={RFValue(10)} color={Colors.textSecondary} />
-                <Text style={styles.creditText}>{creditsRemaining} credits available</Text>
+                {/* <CreditCard size={RFValue(10)} color={Colors.textSecondary} />
+                <Text style={styles.creditText}>{creditsRemaining} credits available</Text> */}
                 <TouchableOpacity style={styles.unlockBtn} onPress={handleUnlockContact}>
                   <Text style={styles.unlockBtnText}>Unlock Contact</Text>
                 </TouchableOpacity>
@@ -285,7 +330,7 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               </View>
             </View>
             <Text style={styles.summaryText}>
-              {displayApplicant.summary || ''}
+              {displayApplicant.summary || 'Not Provided'}
             </Text>
           </RAnimated.View>
 
@@ -656,6 +701,7 @@ const styles = StyleSheet.create({
   creditRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: wp('1.5%'),
   },
   creditText: {

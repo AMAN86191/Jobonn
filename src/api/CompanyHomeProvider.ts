@@ -71,4 +71,13 @@ export const getJobAppliedCandidates = async (jobId: number | string) => {
   }
 };
 
+export const unlockCandidateContact = async (payload: { candidate_id: number | string }) => {
+  try {
+    const response = await api.post(`/company/view-candidate-profile/${payload.candidate_id}`);
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
 
