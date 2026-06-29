@@ -127,13 +127,18 @@ export const ProfileHeaderInfo = ({ user, profile, completenessValue, onEdit }: 
           <BadgeCheck size={RFValue(12)} color={Colors.primary} fill={Colors.primaryLight} style={{ marginLeft: wp('1%') }} />
         </View>
 
-        <Text style={styles.designation}>
-          {profile?.jobTitle || profile?.designation || 'Candidate'}
-        </Text>
+        {!!(user?.uid || user?.candidate?.user?.uid) && (
+          <Text style={styles.uidText}>User ID: {user?.uid || user?.candidate?.user?.uid}</Text>
+        )}
+        {profile?.jobTitle || profile?.designation ? (
+          <Text style={styles.designation}>
+            {profile?.jobTitle || profile?.designation}
+          </Text>
+        ) : null}
 
         {/* <View style={styles.locationRow}>
         <MapPin size={RFValue(9)} color={Colors.textSecondary} />
-        <Text style={styles.locationText}>{profile?.city || profile?.city || 'Not Specified'}</Text>
+        <Text style={styles.locationText}>{profile?.city || profile?.city || 'NotSpecified'}</Text>
       </View> */}
 
         <View style={styles.locationRow}>
@@ -189,13 +194,13 @@ export const ProfileHeaderInfo = ({ user, profile, completenessValue, onEdit }: 
   );
 };
 
-export const StatsRow = () => (
+export const StatsRow = ({ appliedJobsCount = 0 }: { appliedJobsCount?: number }) => (
   <View style={styles.statsRow}>
     <View style={styles.statCard}>
       <View style={[styles.statIconBox, { backgroundColor: Colors.primaryLight }]}>
         <Send size={RFValue(10)} color={Colors.primary} />
       </View>
-      <Text style={styles.statCount}>24</Text>
+      <Text style={styles.statCount}>{appliedJobsCount}</Text>
       <Text style={styles.statLabel}>Applied Jobs</Text>
       <View style={styles.statTrendRow}>
         <Text style={styles.statTrendText}>This week</Text>
@@ -703,6 +708,12 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: hp('0.2%') },
   name: { fontSize: RFValue(12), fontWeight: '700', color: Colors.textPrimary },
+  uidText: {
+    fontSize: RFValue(8.2),
+    color: Colors.primary,
+    fontWeight: '700',
+    marginBottom: hp('0.3%'),
+  },
   designation: { fontSize: RFValue(9.5), color: Colors.primary, fontWeight: '600', marginBottom: hp('0.3%') },
   locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: hp('0.6%') },
   locationText: { fontSize: RFValue(8), color: Colors.textSecondary, marginLeft: wp('1%') },

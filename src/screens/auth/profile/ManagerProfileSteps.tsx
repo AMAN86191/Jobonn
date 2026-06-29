@@ -15,6 +15,8 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Plus, Trash2, Edit2 } from 'lucide-react-native';
 import DatePicker from 'react-native-date-picker';
+import { useDispatch } from 'react-redux';
+import { getJobIndustriesSlice } from '../../../redux/PostJobSlice';
 
 interface ManagerProfileStepsProps {
   currentStep: number;
@@ -63,9 +65,31 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
   totalSteps,
   initialData,
 }) => {
+  const dispatch = useDispatch();
+  const [industries, setIndustries] = useState<string[]>([
+    'IT/Software', 'Healthcare', 'Finance', 'Education', 'Manufacturing', 'Other'
+  ]);
   const [isAwardModalVisible, setIsAwardModalVisible] = useState(false);
   const [editingAwardIndex, setEditingAwardIndex] = useState<number | null>(null);
   const [isFoundedDatePickerOpen, setIsFoundedDatePickerOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchIndustries = async () => {
+      try {
+        const response = await dispatch(getJobIndustriesSlice() as any).unwrap();
+        console.log('getJobIndustries response in steps:', response);
+        const list = response?.job_industries
+          ?.filter((i: any) => typeof i === 'string' || Number(i?.status) === 1)
+          ?.map((i: any) => typeof i === 'string' ? i : (i.industry_name || '')) || [];
+        if (list.length > 0) {
+          setIndustries(list);
+        }
+      } catch (error) {
+        console.log('Error loading industries in steps:', error);
+      }
+    };
+    fetchIndustries();
+  }, [dispatch]);
 
   const getSchemaForStep = (step: number) => {
     switch (step) {
@@ -168,7 +192,7 @@ const ManagerProfileSteps: React.FC<ManagerProfileStepsProps> = ({
         <CustomInput label="Office Location" placeholder="e.g. Bangalore, India" value={value} onChangeText={onChange} error={errors.location?.message as string} />
       )} />
       <Controller control={control} name="industry" render={({ field: { onChange, value } }) => (
-        <DropdownInput label="Industry Type" value={value} options={['IT/Software', 'Healthcare', 'Finance', 'Education', 'Manufacturing', 'Other']} onSelect={onChange} error={errors.industry?.message as string} />
+        <DropdownInput label="Industry Type" value={value} options={industries} onSelect={onChange} error={errors.industry?.message as string} />
       )} />
       <Controller control={control} name="companySize" render={({ field: { onChange, value } }) => (
         <DropdownInput label="Company Size" value={value} options={['1-10', '11-50', '51-200', '201-500', '500+']} onSelect={onChange} error={errors.companySize?.message as string} />

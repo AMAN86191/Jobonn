@@ -7,26 +7,32 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, Briefcase, Calendar, AlertCircle, ChevronRight, Building2, CreditCard, FileClock, BarChart3, ArrowLeft, ArrowRight } from 'lucide-react-native';
+import { Users, Briefcase, Calendar, AlertCircle, ArrowLeft, ArrowRight, CreditCard, FileClock, BarChart3 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import { Colors } from '../../theme/Colors';
 import ManagerHeader from '../../components/Manager_component/ManagerHeader';
 import PostJobBanner from '../../components/Manager_component/PostJobBanner';
-import StatCard from '../../components/Manager_component/StatCard';
-import CandidateCard, { getAvatarColor } from '../../components/Manager_component/CandidateCard';
 import ActiveJobCard from '../../components/Manager_component/ActiveJobCard';
 import AdSlider from '../../components/Manager_component/AdSlider';
 import { RFValue } from 'react-native-responsive-fontsize';
-import { recruiterProfile, jobs, talentDatabase, managedCompanies, packages, contactCredits } from '../../data/jobonnStaticData';
+import { recruiterProfile, jobs } from '../../data/jobonnStaticData';
 import ProfileCompletenessBanner from '../../components/Manager_component/ProfileCompletenessBanner';
+import { getProfileCompleteness } from '../../utils/profileCompleteness';
 
 import { useDispatch, useSelector } from 'react-redux';
 import { getCompanyJobsSlice, getCompanyProfileSlice } from '../../redux/CompanyHomeSlice';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
 import Toast from 'react-native-toast-message';
+import StatCard from '../../components/Manager_component/StatCard';
 
 
+
+const getLatestActivePackage = (profile: any) => {
+  if (!profile?.company_packages || !Array.isArray(profile.company_packages)) return null;
+  const activePackages = profile.company_packages.filter((p: any) => p.status === 'active');
+  if (activePackages.length === 0) return null;
+  return [...activePackages].sort((a: any, b: any) => Number(b.id) - Number(a.id))[0];
+};
 
 const ManagerHomeScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
@@ -35,11 +41,16 @@ const ManagerHomeScreen = ({ navigation }: any) => {
   const [companyProfile, setCompanyProfile] = useState<any>(null);
 
   const { jobs: rawJobs, loading, lastPage } = useSelector((state: any) => state.companyHome);
-const STATS = [
-  { id: '1', title: 'Active Jobs', value: `${jobs.length}`, icon: Briefcase, color: Colors.primary, subtitle: '+2 this week' },
-  { id: '2', title: 'Applicants', value: `${recruiterProfile.stats.totalApplicants}`, icon: Users, color: Colors.info, subtitle: '+34 today' },
-  { id: '3', title: 'Interviews', value: '18', icon: Calendar, color: Colors.success, subtitle: 'Scheduled' },
-];
+  const STATS = useMemo(() => {
+    const activeJobsCount = rawJobs?.length || 0;
+    const totalApplicants = companyProfile?.application_stats?.total || 0;
+    const scheduledInterviews = companyProfile?.application_stats?.interview_schedule || companyProfile?.application_stats?.interview || 0;
+    return [
+      { id: '1', title: 'Active Jobs', value: `${activeJobsCount}`, icon: Briefcase, color: Colors.primary, subtitle: 'Active listings' },
+      { id: '2', title: 'Applicants', value: `${totalApplicants}`, icon: Users, color: Colors.info, subtitle: 'Total applied' },
+      { id: '3', title: 'Interviews', value: `${scheduledInterviews}`, icon: Calendar, color: Colors.success, subtitle: 'Scheduled' },
+    ];
+  }, [rawJobs, companyProfile]);
   useEffect(() => {
     dispatch(getCompanyJobsSlice(page) as any);
   }, [dispatch, page]);
@@ -49,8 +60,31 @@ const STATS = [
   }, [rawJobs]);
 
   const activeCompanyPackage = useMemo(() => {
-    if (!companyProfile?.company_packages || !Array.isArray(companyProfile.company_packages)) return null;
-    return companyProfile.company_packages.find((p: any) => p.status === 'active');
+    return getLatestActivePackage(companyProfile);
+  }, [companyProfile]);
+
+  const isLimitExceeded = useMemo(() => {
+    if (!companyProfile) return false;
+    const activePackageObj = getLatestActivePackage(companyProfile);
+    if (!activePackageObj) return true;
+
+    const used = Number(activePackageObj.used_job_posts || 0);
+    const total = Number(activePackageObj.package?.no_of_job_post || 0);
+    return total > 0 && used >= total;
+  }, [companyProfile]);
+
+  const activePackageMessage = useMemo(() => {
+    if (!companyProfile) return '';
+    const activePackageObj = getLatestActivePackage(companyProfile);
+    if (!activePackageObj) {
+      return 'You do not have any active package. Please purchase a plan to unlock all features.';
+    }
+    const used = Number(activePackageObj.used_job_posts || 0);
+    const total = Number(activePackageObj.package?.no_of_job_post || 0);
+    if (total > 0 && used >= total) {
+      return `You have used all posts in your active plan.`;
+    }
+    return '';
   }, [companyProfile]);
 
   const loadUser = async () => {
@@ -79,8 +113,18 @@ const STATS = [
       return;
     }
 
-    const companyPackages = companyProfile?.company_packages || [];
-    const activePackageObj = companyPackages.find((p: any) => p.status === 'active');
+    // Check profile completeness (minimum 90% required to post job)
+    const completeness = getProfileCompleteness(companyProfile);
+    if (completeness.percentage < 90) {
+      Toast.show({
+        type: 'error',
+        text1: 'Profile Incomplete',
+        text2: `Complete your company profile to post a job (${completeness.percentage}% completed).`,
+      });
+      return;
+    }
+
+    const activePackageObj = getLatestActivePackage(companyProfile);
 
     if (!activePackageObj) {
       Toast.show({
@@ -146,7 +190,7 @@ const STATS = [
             ))}
           </ScrollView>
         </View> */}
-
+{/* 
         <View style={styles.controlGrid}>
           <TouchableOpacity style={styles.controlCard} onPress={() => navigation.navigate('PackageManagement')}>
             <CreditCard size={RFValue(13)} color={Colors.primary} />
@@ -167,10 +211,36 @@ const STATS = [
             <Text style={styles.controlValue}>Reports</Text>
             <Text style={styles.controlLabel}>Hiring and revenue</Text>
           </TouchableOpacity>
-        </View>
+        </View>  */}
 
         {/* Profile Completeness Banner */}
         <ProfileCompletenessBanner user={user} navigation={navigation} />
+
+        {/* Package Limit / Exceed Banner */}
+        {isLimitExceeded && (
+          <View style={styles.limitBanner}>
+            <View style={styles.limitBannerContent}>
+              <View style={styles.limitIconBg}>
+                <AlertCircle color="#E11D48" size={RFValue(16)} />
+              </View>
+              <View style={styles.limitTextWrap}>
+                <Text style={styles.limitTitle}>
+                  {!activeCompanyPackage ? 'No Active Package' : 'Package Limit Exceeded'}
+                </Text>
+                <Text style={styles.limitSubtitle}>
+                  {activePackageMessage}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.purchaseBtn}
+              onPress={() => navigation.navigate('PackageManagement')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.purchaseBtnText}>Purchase Plan</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Stats */}
         <View style={styles.statsRow}>
@@ -185,7 +255,7 @@ const STATS = [
               }}
             />
           ))}
-        </View>
+        </View> 
 
         {/* Active Jobs */}
         <View style={styles.sectionHeader}>
@@ -198,7 +268,12 @@ const STATS = [
         {loading && normalizedJobs.length === 0 ? (
           <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('2%') }} />
         ) : normalizedJobs.length === 0 ? (
-          <Text style={{ textAlign: 'center', color: Colors.textTertiary, marginVertical: hp('2%'), fontSize: RFValue(10) }}>No active jobs found</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No active jobs found</Text>
+            <TouchableOpacity style={styles.postFirstJobBtn} onPress={handlePostJobPress} activeOpacity={0.85}>
+              <Text style={styles.postFirstJobBtnText}>Post Your First Job</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             {normalizedJobs.map((job: any) => (
@@ -503,6 +578,90 @@ const styles = StyleSheet.create({
     fontSize: RFValue(9.5),
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp('3%'),
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: hp('1%'),
+  },
+  emptyText: {
+    fontSize: RFValue(9.5),
+    color: Colors.textSecondary,
+    marginBottom: hp('1.2%'),
+    fontWeight: '500',
+  },
+  postFirstJobBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: wp('4.5%'),
+    paddingVertical: hp('1%'),
+    borderRadius: 8,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  postFirstJobBtnText: {
+    color: Colors.white,
+    fontSize: RFValue(9.5),
+    fontWeight: '700',
+  },
+  limitBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 12,
+    padding: wp('4%'),
+    marginBottom: hp('1.5%'),
+    marginTop: hp('1%'),
+  },
+  limitBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp('1.2%'),
+    gap: wp('3%'),
+  },
+  limitIconBg: {
+    backgroundColor: '#FFE4E6',
+    padding: wp('2%'),
+    borderRadius: 10,
+  },
+  limitTextWrap: {
+    flex: 1,
+  },
+  limitTitle: {
+    fontSize: RFValue(11),
+    fontWeight: '800',
+    color: '#991B1B',
+    marginBottom: hp('0.2%'),
+  },
+  limitSubtitle: {
+    fontSize: RFValue(8.8),
+    color: '#B91C1C',
+    fontWeight: '500',
+    lineHeight: hp('1.8%'),
+  },
+  purchaseBtn: {
+    backgroundColor: '#DC2626',
+    paddingVertical: hp('1%'),
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  purchaseBtnText: {
+    color: Colors.white,
+    fontSize: RFValue(10),
+    fontWeight: '700',
   },
 });
 

@@ -20,29 +20,25 @@ import { getJobAppliedCandidates } from '../../api/CompanyHomeProvider';
 import { StatusType } from '../../components/Manager_component/StatusBadge';
 const mapApiStatusToTab = (apiStatus: string) => {
   switch (apiStatus?.toLowerCase()) {
-    case 'applied': return 'New';
+    case 'applied': return 'Applied';
     case 'shortlisted': return 'Shortlisted';
-    case 'invited': return 'Invited';
-    case 'accepted': return 'Accepted Invite';
-    case 'interview': return 'Interview';
-    case 'selected': return 'Selected';
+    case 'interview_schedule':
+    case 'interview':
+      return 'Interview Scheduled';
     case 'hired': return 'Hired';
     case 'rejected': return 'Rejected';
-    default: return 'New';
+    default: return 'Applied';
   }
 };
 
 const mapTabToBadgeStatus = (tabName: string): StatusType => {
   switch (tabName) {
-    case 'New': return 'New';
+    case 'Applied': return 'New';
     case 'Shortlisted': return 'Shortlisted';
-    case 'Invited': return 'Pending';
-    case 'Accepted Invite': return 'Active';
-    case 'Interview': return 'Interview';
-    case 'Selected': return 'Active';
+    case 'Interview Scheduled': return 'Interview';
     case 'Hired': return 'Hired';
     case 'Rejected': return 'Rejected';
-    default: return 'Pending';
+    default: return 'New';
   }
 };
 
@@ -144,7 +140,7 @@ const FILTER_SECTIONS: FilterSection[] = [
     options: [],
   },
 ];
-const TABS = ['New', 'Shortlisted', 'Invited', 'Accepted Invite', 'Interview', 'Selected', 'Hired', 'Rejected'];
+const TABS = ['Applied', 'Shortlisted', 'Interview Scheduled', 'Hired', 'Rejected'];
 const ManagerJobDetailsScreen = ({ navigation, route }: any) => {
   const rawJob = route.params?.job;
   const job = useMemo(() => {
@@ -155,7 +151,7 @@ const ManagerJobDetailsScreen = ({ navigation, route }: any) => {
 
   const dispatch = useDispatch();
   const [filterVisible, setFilterVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('New');
+  const [activeTab, setActiveTab] = useState('Applied');
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [statusVisible, setStatusVisible] = useState(false);
   const [updating, setUpdating] = useState(false);

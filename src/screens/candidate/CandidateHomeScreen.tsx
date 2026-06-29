@@ -132,7 +132,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
           <View style={styles.welcomeLeft}>
 
             <View>
-              <Image source={require('../../../assets/images/logo/jpn on logo.png')} style={styles.avatarImage} />
+              <Image source={require('../../../assets/images/logo/logo.png')} style={styles.avatarImage} />
             </View>
 
             <View style={styles.greetingContent}>
@@ -144,7 +144,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
           <Image source={require('../../../assets/images/bag.png')} style={styles.illustration} />
         </View>
 
-        <View style={styles.statsGrid}>
+        {/* <View style={styles.statsGrid}>
           {dashboardStats.map(item => {
             const Icon = item.icon;
             return (
@@ -157,13 +157,13 @@ const CandidateHomeScreen = ({ navigation }: any) => {
               </View>
             );
           })}
-        </View>
+        </View> */}
 
         {/* Incomplete Profile Banner */}
         <CandidateProfileCompletenessBanner user={user} navigation={navigation} />
 
         {/* Search Section */}
-        <View style={styles.searchRow}>
+        {/* <View style={styles.searchRow}>
           <TouchableOpacity
             style={styles.searchInputWrap}
             activeOpacity={0.8}
@@ -178,10 +178,10 @@ const CandidateHomeScreen = ({ navigation }: any) => {
               pointerEvents="none"
             />
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* Categories */}
-        <ScrollView
+        {/* <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesRow}
@@ -202,14 +202,16 @@ const CandidateHomeScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             )
           })}
-        </ScrollView>
+        </ScrollView> */}
 
         {/* Featured Jobs */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Featured Jobs</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('JobsTab')}>
-            <Text style={styles.seeAllText}>See all {'>'}</Text>
-          </TouchableOpacity>
+          {normalizedJobs.length > 0 && (
+            <TouchableOpacity onPress={() => navigation.navigate('JobsTab')}>
+              <Text style={styles.seeAllText}>See all {'>'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {jobsLoading && normalizedJobs.length === 0 ? (
@@ -243,7 +245,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
         ))} */}
 
         {/* Top Companies Hiring */}
-        <View style={styles.sectionHeader}>
+        {/* <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Top Companies Hiring</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topCompaniesRow}>
@@ -255,10 +257,10 @@ const CandidateHomeScreen = ({ navigation }: any) => {
               <Text style={styles.companyName} numberOfLines={1}>{comp.name}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </ScrollView> */}
 
         {/* Explore by Category */}
-        <View style={styles.sectionHeader}>
+        {/* <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Explore by Category</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.departmentsRow}>
@@ -277,7 +279,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             )
           })}
-        </ScrollView>
+        </ScrollView> */}
 
         {/* Promo Banner */}
         <View style={styles.promoBanner} >

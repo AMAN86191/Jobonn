@@ -14,6 +14,7 @@ import FilterModal, { FilterSection } from '../../components/Manager_component/F
 import { getCompanyJobs, getCompanyProfile } from '../../api/CompanyHomeProvider';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
 import Toast from 'react-native-toast-message';
+import { getProfileCompleteness } from '../../utils/profileCompleteness';
 
 const TABS = ['Active', 'Closed', 'Draft', 'Expired'];
 
@@ -105,9 +106,21 @@ const ManagerJobsScreen = ({ navigation }: any) => {
       });
       return;
     }
-
+    // Check profile completeness (minimum 90% required to post job)
+     const completeness = getProfileCompleteness(companyProfile);
+     if (completeness.percentage < 90) {
+       Toast.show({
+         type: 'error',
+         text1: 'Profile Incomplete',
+         text2: `Complete your company profile to post a job (${completeness.percentage}% completed).`,
+       });
+       return;
+     }
     const companyPackages = companyProfile?.company_packages || [];
-    const activePackageObj = companyPackages.find((p: any) => p.status === 'active');
+    const activePackages = companyPackages.filter((p: any) => p.status === 'active');
+    const activePackageObj = activePackages.length > 0
+      ? [...activePackages].sort((a: any, b: any) => Number(b.id) - Number(a.id))[0]
+      : null;
 
     if (!activePackageObj) {
       Toast.show({

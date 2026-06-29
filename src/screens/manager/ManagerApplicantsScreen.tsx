@@ -14,31 +14,29 @@ import { StatusType } from '../../components/Manager_component/StatusBadge';
 import { useDispatch, useSelector } from 'react-redux';
 import { getAppliedCandidatesSlice } from '../../redux/CompanyHomeSlice';
 
-const TABS = ['New', 'Shortlisted', 'Invited', 'Accepted Invite', 'Interview', 'Hired', 'Rejected'];
+const TABS = ['Applied', 'Shortlisted', 'Interview Scheduled', 'Hired', 'Rejected'];
 
 const mapApiStatusToTab = (apiStatus: string) => {
   switch (apiStatus?.toLowerCase()) {
-    case 'applied': return 'New';
+    case 'applied': return 'Applied';
     case 'shortlisted': return 'Shortlisted';
-    case 'invited': return 'Invited';
-    case 'accepted': return 'Accepted Invite';
-    case 'interview': return 'Interview';
+    case 'interview_schedule':
+    case 'interview':
+      return 'Interview Scheduled';
     case 'hired': return 'Hired';
     case 'rejected': return 'Rejected';
-    default: return 'New';
+    default: return 'Applied';
   }
 };
 
 const mapTabToBadgeStatus = (tabName: string): StatusType => {
   switch (tabName) {
-    case 'New': return 'New';
+    case 'Applied': return 'New';
     case 'Shortlisted': return 'Shortlisted';
-    case 'Invited': return 'Pending';
-    case 'Accepted Invite': return 'Active';
-    case 'Interview': return 'Interview';
+    case 'Interview Scheduled': return 'Interview';
     case 'Hired': return 'Hired';
     case 'Rejected': return 'Rejected';
-    default: return 'Pending';
+    default: return 'New';
   }
 };
 
@@ -145,7 +143,7 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
   const dispatch = useDispatch<any>();
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('New');
+  const [activeTab, setActiveTab] = useState('Applied');
   const [search, setSearch] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [selected, setSelected] = useState<Record<string, string[]>>({});

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { Bell, Logs } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 import { RFValue } from 'react-native-responsive-fontsize';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+const logo = require('../../../assets/images/logo/logo.png')
 
 interface ManagerHeaderProps {
   onNotifPress?: () => void;
@@ -25,7 +26,7 @@ const ManagerHeader: React.FC<ManagerHeaderProps> = ({ onNotifPress, unreadCount
   }, []);
   console.log('user', user)
   const name = user?.name || 'Manager';
-  const company = user?.company?.company_name || 'JobONN';
+  const company = user?.company?.company_name || 'Jobonn';
   const firstName = name.split(' ')[0];
 
   return (
@@ -42,11 +43,13 @@ const ManagerHeader: React.FC<ManagerHeaderProps> = ({ onNotifPress, unreadCount
           <Text style={styles.welcomeText}>Hello, {firstName} 👋</Text>
         </View>
       </View>
-
-      <TouchableOpacity style={styles.notifBtn} onPress={onNotifPress} activeOpacity={0.7}>
-        <Bell color={Colors.textPrimary} size={RFValue(13)} strokeWidth={2} />
-        {unreadCount > 0 && <View style={styles.badge} />}
-      </TouchableOpacity>
+      <View style={styles.right}>
+        <Image source={logo} style={styles.avatar} />
+        <TouchableOpacity style={styles.notifBtn} onPress={onNotifPress} activeOpacity={0.7}>
+          <Bell color={Colors.textPrimary} size={RFValue(13)} strokeWidth={2} />
+          {unreadCount > 0 && <View style={styles.badge} />}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -59,6 +62,13 @@ const styles = StyleSheet.create({
     marginBottom: hp('2%'),
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: wp('2%') },
+  right: { flexDirection: 'row', alignItems: 'center', gap: wp('2%') },
+  avatar: {
+    width: wp('7.5%'),
+    height: wp('7.5%'),
+    // borderRadius: wp('2.5%'),
+    resizeMode: 'contain',
+  },
 
   companyText: { fontSize: RFValue(8), color: Colors.textPrimary, fontWeight: '500', letterSpacing: 0.3 },
   welcomeText: { fontSize: RFValue(11), fontWeight: '700', color: Colors.textPrimary },

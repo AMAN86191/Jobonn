@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,9 @@ import {
   ScrollView,
   StatusBar,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
+import { getAllScheduledInterviews } from '../../api/CompanyHomeProvider';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -21,34 +23,235 @@ import { Colors } from '../../theme/Colors';
 import RAnimated, { FadeInDown } from 'react-native-reanimated';
 import MainManagerHeader from '../../components/Manager_component/MainManagerHeader';
 import ScheduleInterviewModal from '../../components/Manager_component/ScheduleInterviewModal';
-import { scheduledInterviews } from '../../data/jobonnStaticData';
+import { useDispatch } from 'react-redux';
+import { updateHiringProcessSlice } from '../../redux/CompanyHomeSlice';
+import Toast from 'react-native-toast-message';
 
-const SCHEDULED_INTERVIEWS = scheduledInterviews;
+
 
 const TABS = [
   { label: 'Today', active: true },
   { label: 'Upcoming', active: false },
-  { label: 'Completed', active: false },
+
 ];
 
-const ManagerInterviewsScreen = () => {
+const parseDateString = (dateStr: string) => {
+  try {
+    const months = {
+      january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
+      july: '07', august: '08', september: '09', october: '10', november: '11', december: '12'
+    } as any;
+    const parts = dateStr.trim().split(/\s+/);
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = months[parts[1].toLowerCase()] || '01';
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  } catch (e) {
+    console.log('Error parsing date string:', e);
+  }
+  return dateStr;
+};
+
+const parseTimeString = (timeStr: string) => {
+  try {
+    const cleanStr = timeStr.trim();
+    const hasAmPm = cleanStr.toLowerCase().includes('am') || cleanStr.toLowerCase().includes('pm');
+    if (hasAmPm) {
+      const isPm = cleanStr.toLowerCase().includes('pm');
+      const timePart = cleanStr.replace(/(am|pm)/i, '').trim();
+      let [hours, minutes] = timePart.split(':');
+      let hoursNum = parseInt(hours);
+      if (isPm && hoursNum < 12) {
+        hoursNum += 12;
+      }
+      if (!isPm && hoursNum === 12) {
+        hoursNum = 0;
+      }
+      return `${String(hoursNum).padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+    } else {
+      const parts = cleanStr.split(':');
+      if (parts.length >= 2) {
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+      }
+    }
+  } catch (e) {
+    console.log('Error parsing time string:', e);
+  }
+  return timeStr;
+};
+
+const getInterviewCategory = (dateStr: string, status: string) => {
+  if (!dateStr) return 'Upcoming';
+  try {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+    if (dateStr === todayStr) {
+      return 'Today';
+    }
+
+    const interviewDate = new Date(dateStr);
+    const todayDate = new Date(todayStr);
+
+    if (interviewDate < todayDate) {
+      return 'Completed';
+    } else {
+      return 'Upcoming';
+    }
+  } catch (e) {
+    return 'Upcoming';
+  }
+};
+
+const ManagerInterviewsScreen = ({ navigation }: any) => {
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState('Today');
-  const [interviews, setInterviews] = useState(SCHEDULED_INTERVIEWS);
+  const [interviews, setInterviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedInterviewId, setSelectedInterviewId] = useState<string | null>(null);
+
+  const fetchInterviews = async () => {
+    setLoading(true);
+    try {
+      console.log('Fetching all scheduled interviews...');
+      const response = await getAllScheduledInterviews();
+      console.log('All Scheduled Interviews API Response:', response);
+      if (response && response.status && Array.isArray(response.data)) {
+        const mapped = response.data.map((item: any) => {
+          const cand = item.user?.candidate || {};
+          const userObj = item.user || {};
+          const jobObj = item.job || {};
+          const jobTitle = jobObj.job_title?.job_name || 'React Js Developer';
+
+          let formattedDate = item.interview_date || '';
+          let dayOfWeek = '';
+          if (item.interview_date) {
+            try {
+              const d = new Date(item.interview_date);
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              formattedDate = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+              const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              dayOfWeek = days[d.getDay()];
+            } catch (e) { }
+          }
+
+          let formattedTime = item.interview_time || '';
+          if (item.interview_time) {
+            try {
+              const parts = item.interview_time.split(':');
+              if (parts.length >= 2) {
+                let hours = parseInt(parts[0]);
+                const minutes = parts[1];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12;
+                formattedTime = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+              }
+            } catch (e) { }
+          }
+
+          return {
+            id: String(item.id),
+            candidate_id: cand.id,
+            candidateName: userObj.name || 'Candidate',
+            role: cand.designation || jobTitle,
+            date: formattedDate,
+            rawDate: item.interview_date,
+            day: dayOfWeek || 'Today',
+            time: formattedTime,
+            rawTime: item.interview_time,
+            type: item.interview_type === 'online' ? 'Video Call' : 'In-Person',
+            rawType: item.interview_type || 'online',
+            platform: item.interview_type === 'online' ? 'Interview Type' : 'Interview Type',
+            mode: item.interview_type === 'online' ? 'Online' : 'On-site',
+            status: getInterviewCategory(item.interview_date, item.status),
+            rawStatus: item.status,
+            applicant: {
+              id: item.id,
+              candidate_id: cand.id,
+              status: item.status,
+              user: userObj,
+              job: jobObj,
+              rawApplication: item,
+            }
+          };
+        });
+        setInterviews(mapped);
+      }
+    } catch (error) {
+      console.log('Error fetching scheduled interviews:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInterviews();
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchInterviews();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const handleRescheduleConfirm = async (date: string, time: string, mode: string) => {
+    if (!selectedInterviewId) return;
+    const interviewObj = interviews.find(i => i.id === selectedInterviewId);
+    if (!interviewObj) return;
+
+    const candidateId = interviewObj.candidate_id;
+    const applicationId = interviewObj.id;
+
+    const payload = {
+      status: 'interview_schedule',
+      interview_type: mode.toLowerCase(),
+      interview_date: parseDateString(date),
+      interview_time: parseTimeString(time),
+    };
+
+    try {
+      setUpdating(true);
+      console.log('Rescheduling interview via API:', { candidateId, applicationId, payload });
+      const response = await dispatch(updateHiringProcessSlice({ candidateId, applicationId, payload }) as any).unwrap();
+      console.log('Reschedule response:', response);
+
+      if (response && (response.status === true || response.status_code === 200 || response.status_code === '200')) {
+        Toast.show({
+          type: 'success',
+          text1: 'Interview Rescheduled',
+          text2: 'The interview has been successfully rescheduled.',
+        });
+        setModalVisible(false);
+        fetchInterviews();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Reschedule Failed',
+          text2: response?.message || 'Failed to reschedule interview',
+        });
+      }
+    } catch (e: any) {
+      console.log('Error rescheduling interview:', e);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: e?.message || 'Something went wrong',
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#FDFDFD" />
 
-
       <MainManagerHeader title='Scheduled Interviews' subtitle='Organize and attend your interviews on time' />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-
-
-
-
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
           {TABS.map((tab, idx) => {
             const isActive = activeTab === tab.label;
@@ -67,100 +270,97 @@ const ManagerInterviewsScreen = () => {
         </ScrollView>
 
         {/* Interview Cards */}
-        {interviews.filter(interview => {
-          if (activeTab === 'Completed') return interview.status === 'Completed';
-          if (activeTab === 'Upcoming') return interview.status !== 'Completed';
-          return interview.status !== 'Completed';
-        }).map((interview, index) => (
-          <RAnimated.View
-            key={interview.id}
-            entering={FadeInDown.duration(400).delay(index * 100)}
-            style={[styles.card, { borderLeftColor: Colors.primary }]}
-          >
-            {/* Card Header */}
-            <View style={styles.cardHeaderRow}>
-              <View style={[styles.avatar, { backgroundColor: Colors.primaryLight }]}>
-                <Text style={[styles.avatarText, { color: Colors.primary }]}>
-                  {interview.candidateName.charAt(0)}
-                </Text>
-              </View>
-              <View style={styles.cardHeaderInfo}>
-                <View style={styles.nameStatusRow}>
-                  <Text style={styles.candidateName}>{interview.candidateName}</Text>
-                  <View style={styles.statusPill}>
-                    <View style={[styles.statusDot, { backgroundColor: Colors.primary }]} />
-                    <Text style={[styles.statusText, { color: Colors.primary }]}>{interview.status}</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: hp('5%') }} />
+        ) : interviews.filter(interview => interview.status === activeTab).length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No interviews scheduled for {activeTab.toLowerCase()}</Text>
+          </View>
+        ) : (
+          interviews.filter(interview => interview.status === activeTab).map((interview, index) => (
+            <TouchableOpacity
+              key={interview.id}
+              activeOpacity={0.9}
+              onPress={() => {
+                navigation.navigate('CandidateApplicationFullView', { applicant: interview.applicant });
+              }}
+            >
+              <RAnimated.View
+                entering={FadeInDown.duration(400).delay(index * 100)}
+                style={[styles.card, { borderLeftColor: Colors.primary }]}
+              >
+                {/* Card Header */}
+                <View style={styles.cardHeaderRow}>
+                  <View style={[styles.avatar, { backgroundColor: Colors.primaryLight }]}>
+                    <Text style={[styles.avatarText, { color: Colors.primary }]}>
+                      {interview.candidateName.charAt(0)}
+                    </Text>
+                  </View>
+                  <View style={styles.cardHeaderInfo}>
+                    <View style={styles.nameStatusRow}>
+                      <Text style={styles.candidateName}>{interview.candidateName}</Text>
+                      <View style={styles.statusPill}>
+                        <View style={[styles.statusDot, { backgroundColor: Colors.primary }]} />
+                        <Text style={[styles.statusText, { color: Colors.primary }]}>{interview.status}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.candidateRole}>{interview.role}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.rescheduleBtn}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedInterviewId(interview.id);
+                      setModalVisible(true);
+                    }}
+                  >
+                    <CalendarClock size={RFValue(10.5)} color={Colors.textSecondary} strokeWidth={2.5} />
+                    <Text style={styles.rescheduleTxt}>Reschedule</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Details Box */}
+                <View style={[styles.detailsBox, { backgroundColor: Colors.primaryLight + '50' }]}>
+                  {/* Date */}
+                  <View style={styles.detailCol}>
+                    <CalendarDays size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
+                    <View>
+                      <Text style={styles.detailMain}>{interview.date}</Text>
+                      <Text style={styles.detailSub}>{interview.day}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.dividerVertical} />
+
+                  {/* Time */}
+                  <View style={styles.detailCol}>
+                    <Clock size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
+                    <View>
+                      <Text style={styles.detailMain}>{interview.time}</Text>
+                      <Text style={styles.detailSub}>{interview.duration}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.dividerVertical} />
+
+                  {/* Location */}
+                  <View style={styles.detailCol}>
+                    {interview.type === 'Video Call' ? (
+                      <Video size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
+                    ) : (
+                      <MapPin size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
+                    )}
+                    <View>
+                      <Text style={styles.detailMain}>{interview.platform}</Text>
+                      <Text style={styles.detailSub}>{interview.mode}</Text>
+                    </View>
                   </View>
                 </View>
-                <Text style={styles.candidateRole}>{interview.role}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.rescheduleBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setSelectedInterviewId(interview.id);
-                  setModalVisible(true);
-                }}
-              >
-                <CalendarClock size={RFValue(10.5)} color={Colors.textSecondary} strokeWidth={2.5} />
-                <Text style={styles.rescheduleTxt}>Reschedule</Text>
-              </TouchableOpacity>
-            </View>
 
-            {/* Details Box */}
-            <View style={[styles.detailsBox, { backgroundColor: Colors.primaryLight + '50' }]}>
-              {/* Date */}
-              <View style={styles.detailCol}>
-                <CalendarDays size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
-                <View>
-                  <Text style={styles.detailMain}>{interview.date}</Text>
-                  <Text style={styles.detailSub}>{interview.day}</Text>
-                </View>
-              </View>
-
-              <View style={styles.dividerVertical} />
-
-              {/* Time */}
-              <View style={styles.detailCol}>
-                <Clock size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
-                <View>
-                  <Text style={styles.detailMain}>{interview.time}</Text>
-                  <Text style={styles.detailSub}>{interview.duration}</Text>
-                </View>
-              </View>
-
-              <View style={styles.dividerVertical} />
-
-              {/* Location */}
-              <View style={styles.detailCol}>
-                {interview.type === 'Video Call' ? (
-                  <Video size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
-                ) : (
-                  <MapPin size={RFValue(10.5)} color={Colors.textPrimary} strokeWidth={2} style={{ marginTop: hp('0.2%') }} />
-                )}
-                <View>
-                  <Text style={styles.detailMain}>{interview.platform}</Text>
-                  <Text style={styles.detailSub}>{interview.mode}</Text>
-                </View>
-              </View>
-            </View>
-
-          </RAnimated.View>
-        ))}
-
-        {/* Bottom Alert Box */}
-        {/* <RAnimated.View entering={FadeInDown.duration(400).delay(400)} style={styles.alertBox}>
-          <View style={styles.alertLeft}>
-            <View style={styles.alertIconBg}>
-              <Bell size={RFValue(11)} color={Colors.primary} strokeWidth={2.5} />
-            </View>
-            <View>
-              <Text style={styles.alertTitle}>Stay Ready, Stay Ahead!</Text>
-              <Text style={styles.alertDesc}>Your next interview is in <Text style={{ fontWeight: '800', color: Colors.primary }}>1 day</Text> at <Text style={{ fontWeight: '800', color: Colors.primary }}>10:30 AM</Text></Text>
-            </View>
-          </View>
-
-        </RAnimated.View> */}
+              </RAnimated.View>
+            </TouchableOpacity>
+          ))
+        )}
 
         <View style={{ height: hp('8%') }} />
       </ScrollView>
@@ -169,24 +369,7 @@ const ManagerInterviewsScreen = () => {
       <ScheduleInterviewModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onConfirm={(date, time, mode) => {
-          setInterviews(prev =>
-            prev.map(item => {
-              if (item.id === selectedInterviewId) {
-                return {
-                  ...item,
-                  date,
-                  time,
-                  mode: mode === 'Online' ? 'Online' : 'On-site',
-                  type: mode === 'Online' ? 'Video Call' : 'In-Person',
-                  platform: mode === 'Online' ? 'Google Meet' : 'Office Room A',
-                };
-              }
-              return item;
-            })
-          );
-          setModalVisible(false);
-        }}
+        onConfirm={handleRescheduleConfirm}
       />
     </SafeAreaView>
   );
@@ -399,7 +582,24 @@ const styles = StyleSheet.create({
     opacity: 0.4,
     zIndex: 1,
     transform: [{ rotate: '15deg' }]
-  }
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp('8%'),
+    backgroundColor: Colors.white,
+    borderRadius: wp('4%'),
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginTop: hp('2%'),
+    marginHorizontal: wp('2%'),
+    elevation: 1,
+  },
+  emptyStateText: {
+    fontSize: RFValue(11),
+    color: Colors.textPrimary,
+    fontWeight: '700',
+  },
 });
 
 export default ManagerInterviewsScreen;

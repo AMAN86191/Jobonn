@@ -27,18 +27,6 @@ const getTierTheme = (packageName: string) => {
       bgColor: '#F3F4F6',
       icon: Building2,
     };
-  } else if (name.includes('gold') || name.includes('premium')) {
-    return {
-      primaryColor: '#D97706', // Gold/Amber tone
-      bgColor: '#FEF3C7',
-      icon: Crown,
-    };
-  } else if (name.includes('platinum') || name.includes('diamond')) {
-    return {
-      primaryColor: '#7C3AED', // Violet tone
-      bgColor: '#F5F3FF',
-      icon: Crown,
-    };
   } else {
     return {
       primaryColor: '#9B5DE0', // Default purple brand theme

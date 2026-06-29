@@ -138,13 +138,13 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
 
         <Animated.View style={[styles.logoBox, logoAnimStyle]}>
           <Image
-            source={require('../../../assets/images/logo/jpn on logo.png')}
+            source={require('../../../assets/images/logo/logo.png')}
             style={styles.logoImage}
           />
         </Animated.View>
 
         <Animated.Text style={[styles.logoText, textAnimStyle]}>
-          JobOnn
+          Jobonn
         </Animated.Text>
 
         <Animated.Text style={[styles.tagline, taglineAnimStyle]}>

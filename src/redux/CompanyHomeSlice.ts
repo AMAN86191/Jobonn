@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getCompanyPackages, packagePurchase, getCompanyProfile, getCompanyJobs, getAppliedCandidates, updateJobStatus, unlockCandidateContact } from '../api/CompanyHomeProvider';
+import { getCompanyPackages, packagePurchase, getCompanyProfile, getCompanyJobs, getAppliedCandidates, updateJobStatus, unlockCandidateContact, updateHiringProcess } from '../api/CompanyHomeProvider';
 
 interface CompanyHomeState {
   packages: any[];
@@ -106,6 +106,21 @@ export const unlockCandidateContactSlice = createAsyncThunk(
   async (payload: { candidate_id: number | string }, { rejectWithValue }) => {
     try {
       const response = await unlockCandidateContact(payload);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const updateHiringProcessSlice = createAsyncThunk(
+  'companyHome/updateHiringProcessSlice',
+  async (
+    { candidateId, applicationId, payload }: { candidateId: number | string; applicationId: number | string; payload: any },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await updateHiringProcess(candidateId, applicationId, payload);
       return response;
     } catch (error) {
       return rejectWithValue(error);

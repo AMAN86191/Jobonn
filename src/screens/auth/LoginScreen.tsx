@@ -55,7 +55,8 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
-
+  const [uId, setUId] = useState('');
+  const [uIdError, setUIdError] = useState('');
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
@@ -71,9 +72,6 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [rememberMe]);
 
-  const checkAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: checkScale.value }],
-  }));
 
   const validateEmail = () => {
     let valid = true;
@@ -85,6 +83,10 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       setPasswordError('Password must be at least 6 characters');
       valid = false;
     } else setPasswordError('');
+    if (!uId || uId.length < 3) {
+      setUIdError('Please enter a valid user ID');
+      valid = false;
+    } else setUIdError('');
     return valid;
   };
 
@@ -114,8 +116,10 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       try {
         setLoading(true);
         const payload = {
-          email: email,
+          uid: uId,
           password: password,
+          email: email,
+
         };
         const res = await dispatch(LoginSlice(payload) as any).unwrap();
         console.log('Login response:', res);
@@ -202,11 +206,11 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       await AsyncStorage.setItem('userData', JSON.stringify(staticUser));
       setShowOtpModal(false);
 
-      setUser( {
+      setUser({
         email: staticUser.email || '',
         role: staticUser.role || role,
       });
-      setCrashlyticsUser( staticUser.email || '', staticUser.name || '');
+      setCrashlyticsUser(staticUser.email || '', staticUser.name || '');
       logLogin('otp');
 
       ToastAndroid.show('Static login successful!', ToastAndroid.SHORT);
@@ -263,6 +267,15 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
               />
             ) : (
               <>
+                <CustomInput
+                  label="User Id"
+                  placeholder="Enter Your User Id"
+                  keyboardType="default"
+                  autoCapitalize="none"
+                  value={uId}
+                  onChangeText={setUId}
+                  error={uIdError}
+                />
                 <CustomInput
                   label="Email Address"
                   placeholder="Enter Your Email"
@@ -331,32 +344,7 @@ const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Demo Hint for Testing */}
-          <View
-
-            style={styles.hintCard}
-          >
-            <View style={styles.hintHeader}>
-              <View style={styles.hintDot} />
-              <Text style={styles.hintTitle}>Testing Guide</Text>
-            </View>
-            <View style={styles.testBtnRow}>
-              <TouchableOpacity
-                style={[styles.testBtn, { backgroundColor: Colors.primary }]}
-                onPress={() => navigation.navigate('CandidateHome')}
-              >
-                <Text style={styles.testBtnText}>View Candidate UI</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.testBtn, { backgroundColor: Colors.secondary }]}
-                onPress={() => navigation.navigate('ManagerHome')}
-              >
-                <Text style={styles.testBtnText}>View Manager UI</Text>
-              </TouchableOpacity>
-            </View>
-
-
-          </View>
+        
         </ScrollView>
       </AppBackground>
 
@@ -445,75 +433,6 @@ const styles = StyleSheet.create({
     marginTop: hp('1%'),
   },
   signupLink: { color: Colors.primary, fontWeight: '700' },
-  hintCard: {
-    marginTop: hp('4%'),
-    backgroundColor: Colors.primary + '10',
-    padding: wp('4%'),
-    borderRadius: wp('4%'),
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
-    borderStyle: 'dashed',
-  },
-  hintHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: hp('1%'),
-    gap: wp('2%'),
-  },
-  hintDot: {
-    width: wp('2%'),
-    height: wp('2%'),
-    borderRadius: wp('1%'),
-    backgroundColor: Colors.primary,
-  },
-  hintTitle: {
-    ...Typography.caption,
-    fontWeight: '800',
-    color: Colors.primary,
-    letterSpacing: 0.5,
-  },
-  hintText: {
-    ...Typography.caption,
-    color: Colors.textPrimary,
-    marginBottom: hp('0.5%'),
-  },
-  hintSubText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    lineHeight: hp('2%'),
-  },
-  changeRoleBtn: {
-    marginTop: hp('1.5%'),
-    backgroundColor: Colors.primary,
-    paddingVertical: hp('0.8%'),
-    borderRadius: wp('2%'),
-    alignItems: 'center',
-  },
-  changeRoleText: {
-    ...Typography.caption,
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  testBtnRow: {
-    flexDirection: 'row',
-    gap: wp('2%'),
-    marginTop: hp('1.5%'),
-  },
-  testBtn: {
-    flex: 1,
-    paddingVertical: hp('1%'),
-    borderRadius: wp('2.5%'),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  testBtnText: {
-    ...Typography.caption,
-    color: Colors.white,
-  },
 });
 
 export default LoginScreen;

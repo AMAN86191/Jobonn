@@ -80,4 +80,22 @@ export const unlockCandidateContact = async (payload: { candidate_id: number | s
   }
 };
 
+export const updateHiringProcess = async (candidateId: number | string, applicationId: number | string, payload: any) => {
+  try {
+    const response = await api.put(`/company/hiring-process-update/${candidateId}/${applicationId}`, payload);
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const getAllScheduledInterviews = async () => {
+  try {
+    const response = await api.get('/company/all-scheduled-interviews');
+    return response.data;
+  } catch (error: any) {
+    throw error.response?.data || error.message;
+  }
+};
+
 
