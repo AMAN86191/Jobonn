@@ -33,6 +33,7 @@ import {
   MapPin,
   Lock,
   CreditCard,
+  UserCheck,
 } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 import RAnimated, { FadeInDown } from 'react-native-reanimated';
@@ -51,7 +52,7 @@ import { contactCredits } from '../../data/jobonnStaticData';
 import { getAppliedCandidateDetail } from '../../api/CompanyHomeProvider';
 import { normalizeCandidateProfile } from '../../utils/candidateProfileUtils';
 import { useDispatch } from 'react-redux';
-import { unlockCandidateContactSlice } from '../../redux/CompanyHomeSlice';
+import { unlockCandidateContactSlice, updateHiringProcessSlice } from '../../redux/CompanyHomeSlice';
 import Toast from 'react-native-toast-message';
 
 const JOBS_LIST = [
@@ -62,13 +63,132 @@ const JOBS_LIST = [
   'Frontend Developer (React)',
 ];
 
+const parseDateString = (dateStr: string) => {
+  try {
+    const months = {
+      january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
+      july: '07', august: '08', september: '09', october: '10', november: '11', december: '12'
+    } as any;
+    const parts = dateStr.trim().split(/\s+/);
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = months[parts[1].toLowerCase()] || '01';
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  } catch (e) {
+    console.log('Error parsing date string:', e);
+  }
+  return dateStr;
+};
+
+const parseTimeString = (timeStr: string) => {
+  try {
+    const cleanStr = timeStr.trim();
+    const hasAmPm = cleanStr.toLowerCase().includes('am') || cleanStr.toLowerCase().includes('pm');
+    if (hasAmPm) {
+      const isPm = cleanStr.toLowerCase().includes('pm');
+      const timePart = cleanStr.replace(/(am|pm)/i, '').trim();
+      let [hours, minutes] = timePart.split(':');
+      let hoursNum = parseInt(hours);
+      if (isPm && hoursNum < 12) {
+        hoursNum += 12;
+      }
+      if (!isPm && hoursNum === 12) {
+        hoursNum = 0;
+      }
+      return `${String(hoursNum).padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+    } else {
+      const parts = cleanStr.split(':');
+      if (parts.length >= 2) {
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+      }
+    }
+  } catch (e) {
+    console.log('Error parsing time string:', e);
+  }
+  return timeStr;
+};
+
 const CandidateApplicationFullView = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const { applicant } = route.params || {};
   const [_status, setStatus] = useState(applicant?.status || 'New');
+  const isShortlisted = _status?.toLowerCase() === 'shortlisted' || _status?.toLowerCase() === 'interview_schedule' || _status?.toLowerCase() === 'interview';
+  const isInterviewScheduled = _status?.toLowerCase() === 'interview_schedule' || _status?.toLowerCase() === 'interview';
+  const isHired = _status?.toLowerCase() === 'hired';
+  const showHireBtn = isInterviewScheduled || isHired;
   const [noteContent, setNoteContent] = useState('');
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const handleUpdateHiringStatus = async (status: string, extraData?: { type: string; date: string; time: string }) => {
+    const candidateId = displayApplicant.candidate_id || displayApplicant.id || applicant?.candidate_id;
+    const applicationId = detailData?.applications?.[0]?.id ||
+      applicant?.id ||
+      applicant?.rawApplication?.id ||
+      displayApplicant.id ||
+      displayApplicant.rawApplication?.id;
+
+    if (!candidateId || !applicationId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Candidate ID or Application ID not found',
+      });
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+
+      const payload: any = { status };
+      if (status === 'interview_schedule' && extraData) {
+        payload.interview_type = extraData.type.toLowerCase();
+        payload.interview_date = extraData.date;
+        payload.interview_time = extraData.time;
+      }
+
+      console.log('Updating hiring process via slice:', { candidateId, applicationId, payload });
+      const response = await dispatch(updateHiringProcessSlice({ candidateId, applicationId, payload }) as any).unwrap();
+      console.log('Hiring process update response:', response);
+
+      if (response && (response.status === true || response.status_code === 200 || response.status_code === '200')) {
+        setStatus(status);
+        Toast.show({
+          type: 'success',
+          text1: 'Status Updated',
+          text2: `Candidate status updated to ${status === 'interview_schedule' ? 'Interview Scheduled' : status}.`,
+        });
+
+        if (status === 'interview_schedule') {
+          navigation.navigate('ManagerInterviews');
+        }
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Update Failed',
+          text2: response?.message || 'Failed to update hiring status',
+        });
+      }
+    } catch (error: any) {
+      console.log('Update hiring status error:', error);
+      let errorMsg = 'Failed to update status';
+      if (typeof error === 'string') {
+        errorMsg = error;
+      } else if (error && typeof error === 'object') {
+        errorMsg = error.message || error.error || 'Failed to update status';
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: errorMsg,
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [selectedJob, setSelectedJob] = useState('');
   const [contactUnlocked, setContactUnlocked] = useState(!!applicant?.contactUnlocked);
@@ -334,6 +454,19 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             </Text>
           </RAnimated.View>
 
+          {/* Interview Scheduled Banner */}
+          {isInterviewScheduled && (
+            <RAnimated.View entering={FadeInDown.duration(400).delay(270)} style={styles.interviewScheduledBanner}>
+              <Calendar color="#4F46E5" size={RFValue(12)} />
+              <View style={styles.interviewBannerTextWrap}>
+                <Text style={styles.interviewBannerTitle}>Interview Already Scheduled</Text>
+                <Text style={styles.interviewBannerDesc}>
+                  An interview has already been scheduled for this candidate. You can view or manage scheduled interview details from the Interviews tab.
+                </Text>
+              </View>
+            </RAnimated.View>
+          )}
+
           {/* Career Preference Card */}
           <RAnimated.View entering={FadeInDown.duration(400).delay(280)} style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
@@ -506,8 +639,18 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
       </KeyboardAvoidingView>
 
       {/* Tri-Button Action Footer or Send Invite Footer */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, hp('1.5%')) }]}>
-        {route.params?.isRecommended ? (
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, hp('5%')) }]}>
+        {_status?.toLowerCase() === 'rejected' ? (
+          <View style={styles.rejectedMessageContainer}>
+            <XCircle color={Colors.danger} size={RFValue(12)} />
+            <Text style={styles.rejectedMessageText}>This candidate has been rejected</Text>
+          </View>
+        ) : isHired ? (
+          <View style={styles.hiredMessageContainer}>
+            <UserCheck color={Colors.success} size={RFValue(12)} />
+            <Text style={styles.hiredMessageText}>This candidate has been hired</Text>
+          </View>
+        ) : route.params?.isRecommended ? (
           <TouchableOpacity
             style={styles.sendInviteBtn}
             onPress={() => {
@@ -521,28 +664,73 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             {/* Reject Outline Button */}
             <TouchableOpacity
               style={styles.rejectBtnOutline}
-              onPress={() => setStatus('Rejected')}
+              onPress={() => handleUpdateHiringStatus('rejected')}
+              disabled={updatingStatus}
             >
-              <XCircle color={Colors.danger} size={RFValue(10)} />
-              <Text style={styles.rejectBtnText}>Reject</Text>
+              {updatingStatus ? (
+                <ActivityIndicator size="small" color={Colors.danger} />
+              ) : (
+                <>
+                  <XCircle color={Colors.danger} size={RFValue(10)} />
+                  <Text style={styles.rejectBtnText}>Reject</Text>
+                </>
+              )}
             </TouchableOpacity>
 
-            {/* Shortlist Outline Button */}
-            <TouchableOpacity
-              style={styles.shortlistBtnOutline}
-              onPress={() => Alert.alert('Shortlisted', 'Applicant added to shortlist!')}
-            >
-              <Bookmark color={Colors.textPrimary} size={RFValue(10)} />
-              <Text style={styles.shortlistBtnText}>Shortlist</Text>
-            </TouchableOpacity>
+            {showHireBtn ? (
+              /* Hire Button */
+              <TouchableOpacity
+                style={[
+                  styles.shortlistBtnOutline,
+                  isHired && { borderColor: Colors.success, backgroundColor: Colors.success + '10' }
+                ]}
+                onPress={() => handleUpdateHiringStatus('hired')}
+                disabled={updatingStatus || isHired}
+              >
+                {updatingStatus ? (
+                  <ActivityIndicator size="small" color={isHired ? Colors.success : Colors.textPrimary} />
+                ) : (
+                  <>
+                    <UserCheck color={isHired ? Colors.success : Colors.textPrimary} size={RFValue(10)} />
+                    <Text style={[styles.shortlistBtnText, isHired && { color: Colors.success }]}>
+                      {isHired ? 'Hired' : 'Hire'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              /* Shortlist Outline Button */
+              <TouchableOpacity
+                style={[
+                  styles.shortlistBtnOutline,
+                  isShortlisted && { borderColor: Colors.success, backgroundColor: Colors.success + '10' }
+                ]}
+                onPress={() => handleUpdateHiringStatus('shortlisted')}
+                disabled={updatingStatus || isShortlisted}
+              >
+                {updatingStatus ? (
+                  <ActivityIndicator size="small" color={isShortlisted ? Colors.success : Colors.textPrimary} />
+                ) : (
+                  <>
+                    <Bookmark color={isShortlisted ? Colors.success : Colors.textPrimary} size={RFValue(10)} />
+                    <Text style={[styles.shortlistBtnText, isShortlisted && { color: Colors.success }]}>
+                      {isShortlisted ? 'Shortlisted' : 'Shortlist'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
 
-            {/* Schedule solid purple button */}
+            {/* Schedule / Reschedule solid purple button */}
             <TouchableOpacity
               style={styles.scheduleSolidBtn}
               onPress={() => setScheduleModalVisible(true)}
+              disabled={updatingStatus}
             >
               <Calendar color={Colors.white} size={RFValue(10.5)} />
-              <Text style={styles.scheduleSolidText}>Schedule Interview</Text>
+              <Text style={styles.scheduleSolidText}>
+                {isInterviewScheduled ? 'Reschedule Interview' : 'Schedule Interview'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -552,10 +740,15 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
       <ScheduleInterviewModal
         visible={scheduleModalVisible}
         onClose={() => setScheduleModalVisible(false)}
-        onConfirm={(_scheduledDate, _scheduledTime, _mode) => {
+        onConfirm={(scheduledDate, scheduledTime, mode) => {
           setScheduleModalVisible(false);
-          setStatus('Shortlisted');
-          navigation.navigate('ManagerInterviews');
+          const formattedDate = parseDateString(scheduledDate);
+          const formattedTime = parseTimeString(scheduledTime);
+          handleUpdateHiringStatus('interview_schedule', {
+            type: mode,
+            date: formattedDate,
+            time: formattedTime
+          });
         }}
       />
 
@@ -999,6 +1192,66 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.textSecondary,
     lineHeight: RFValue(11.5),
+  },
+  rejectedMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 10,
+    paddingVertical: hp('1.2%'),
+    width: '100%',
+    gap: wp('2%'),
+  },
+  rejectedMessageText: {
+    color: '#B91C1C',
+    fontSize: RFValue(10.5),
+    fontWeight: '700',
+  },
+  interviewScheduledBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 12,
+    padding: wp('3.5%'),
+    marginBottom: hp('1.2%'),
+    gap: wp('3%'),
+  },
+  interviewBannerTextWrap: {
+    flex: 1,
+  },
+  interviewBannerTitle: {
+    fontSize: RFValue(10.5),
+    fontWeight: '800',
+    color: '#3730A3',
+    marginBottom: hp('0.3%'),
+  },
+  interviewBannerDesc: {
+    fontSize: RFValue(8.8),
+    color: '#4338CA',
+    fontWeight: '500',
+    lineHeight: hp('1.8%'),
+  },
+  hiredMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    paddingVertical: hp('1.2%'),
+    width: '100%',
+    gap: wp('2%'),
+  },
+  hiredMessageText: {
+    color: '#047857',
+    fontSize: RFValue(10.5),
+    fontWeight: '700',
   },
 });
 

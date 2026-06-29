@@ -163,7 +163,6 @@ const ManagerProfileScreen = ({ navigation, route }: any) => {
 
   const completeness = useMemo(() => rawProfileData ? getProfileCompleteness(rawProfileData) : null, [rawProfileData]);
   const isProfileIncomplete = useMemo(() => completeness ? !completeness.isComplete : true, [completeness]);
-
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
@@ -226,6 +225,7 @@ const ManagerProfileScreen = ({ navigation, route }: any) => {
             createdAt={user.created_at}
             email={user.email}
             phone={user.phone}
+            uid={user.uid}
           />
 
           {/* About Company Card */}

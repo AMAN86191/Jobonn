@@ -13,6 +13,7 @@ export const normalizeProfileData = (data: any) => {
       email: '',
       phone: '',
       role: 'company',
+      uid: '',
       companyid: '',
       created_at: '',
       manager_profile: {
@@ -56,6 +57,7 @@ export const normalizeProfileData = (data: any) => {
   const email = userObj.email || '';
   const phone = userObj.phone || companyObj.w_phone || '';
   const role = userObj.role || 'company';
+  const uid = userObj.uid || '';
   const companyid = companyObj?.id || data?.company_id || data?.id || '';
   const companyName = companyObj.company_name || companyObj.companyName || '';
   const location = extractLocationName(companyObj.office_location || companyObj.location || '');
@@ -104,7 +106,10 @@ export const normalizeProfileData = (data: any) => {
   }
 
   // Map active package subscription details
-  const activePackageObj = companyObj.company_packages?.find((p: any) => p.status === 'active');
+  const activePackages = companyObj.company_packages?.filter((p: any) => p.status === 'active') || [];
+  const activePackageObj = activePackages.length > 0 
+    ? [...activePackages].sort((a: any, b: any) => Number(b.id) - Number(a.id))[0] 
+    : null;
   const activePackageName = activePackageObj?.package?.package_name || activePackageObj?.package_name || 'No Active Package';
   const activePackageDuration = activePackageObj?.duration_in_months || activePackageObj?.package?.duration_in_months || null;
   const activePackageExpiry = activePackageObj?.expiry_date || activePackageObj?.expires_at || null;
@@ -112,9 +117,9 @@ export const normalizeProfileData = (data: any) => {
   // Map stats
   const stats = {
     postedJobs: companyObj.jobs?.length || data.stats?.postedJobs || data.posted_jobs_count || 0,
-    totalApplicants: data.stats?.totalApplicants || data.total_applicants_count || 0,
-    shortlisted: data.stats?.shortlisted || data.shortlisted_count || 0,
-    hired: data.stats?.hired || data.hired_count || 0
+    totalApplicants: companyObj.application_stats?.total ?? data.stats?.totalApplicants ?? data.total_applicants_count ?? 0,
+    shortlisted: companyObj.application_stats?.shortlisted ?? data.stats?.shortlisted ?? data.shortlisted_count ?? 0,
+    hired: companyObj.application_stats?.hired ?? data.stats?.hired ?? data.hired_count ?? 0
   };
 
   return {
@@ -122,6 +127,7 @@ export const normalizeProfileData = (data: any) => {
     email,
     phone,
     role,
+    uid,
     companyid,
     created_at: companyObj.created_at || data.created_at || '',
     manager_profile: {

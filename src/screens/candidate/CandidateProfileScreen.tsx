@@ -87,8 +87,12 @@ const CandidateProfileScreen = ({ navigation }: any) => {
         const userObj = candidate.user || {};
         const mappedUser = {
           ...userObj,
-          candidate: candidate,
+          candidate: {
+            ...candidate,
+            applied_jobs_count: response.applied_jobs_count ?? candidate.applied_jobs_count ?? 0
+          },
           role: userObj.role || 'candidate',
+          applied_jobs_count: response.applied_jobs_count ?? candidate.applied_jobs_count ?? 0
         };
         // Save to cache
         await AsyncStorage.setItem('userData', JSON.stringify(mappedUser));
@@ -345,7 +349,7 @@ const CandidateProfileScreen = ({ navigation }: any) => {
           <CandidateProfileCompletenessBanner user={user} navigation={navigation} />
 
           <ProfileHeaderInfo user={user} profile={normalizedProfile} completenessValue={completeness.percentage} onEdit={() => openModal('documents')} />
-          <StatsRow />
+          <StatsRow appliedJobsCount={user?.candidate?.applied_jobs_count || user?.applied_jobs_count || 0} />
           <ResumeCard user={user} profile={normalizedProfile} onEdit={() => openModal('documents')} />
           <ProfileSummaryCard profile={normalizedProfile} onEdit={() => openModal('summary')} />
           <CareerPreferenceCard profile={normalizedProfile} onEdit={() => openModal('career')} />

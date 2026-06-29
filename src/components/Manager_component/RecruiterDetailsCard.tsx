@@ -16,6 +16,7 @@ interface RecruiterDetailsCardProps {
   createdAt?: string;
   email: string;
   phone: string;
+  uid?: string;
 }
 
 export const RecruiterDetailsCard: React.FC<RecruiterDetailsCardProps> = React.memo(({
@@ -24,6 +25,7 @@ export const RecruiterDetailsCard: React.FC<RecruiterDetailsCardProps> = React.m
   createdAt,
   email,
   phone,
+  uid,
 }) => {
   const getAvatarInitials = () => {
     if (!name) return 'RM';
@@ -61,6 +63,9 @@ export const RecruiterDetailsCard: React.FC<RecruiterDetailsCardProps> = React.m
         <View style={styles.recruiterInfoBlock}>
           <Text style={styles.recruiterNameText}>{name || 'N/A'}</Text>
           <Text style={styles.recruiterRoleText}>{jobTitle || 'Recruiter'}</Text>
+          {!!uid && (
+            <Text style={styles.uidText}>User ID: {uid}</Text>
+          )}
           <View style={styles.joinDateRow}>
             <Calendar size={RFValue(8.5)} color={Colors.textSecondary} />
             <Text style={styles.joinDateText}>Joined {formattedJoinDate()}</Text>
@@ -165,6 +170,12 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F3F4F6',
     marginVertical: hp('1.2%'),
+  },
+  uidText: {
+    fontSize: RFValue(8.2),
+    color: Colors.primary,
+    fontWeight: '700',
+    marginTop: hp('0.2%'),
   },
 });
 

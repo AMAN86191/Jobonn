@@ -20,13 +20,16 @@ const getStatusDetails = (status: string) => {
       return { text: 'Shortlisted', color: Colors.warning };
     case 'rejected':
       return { text: 'Rejected', color: Colors.danger };
+    case 'interview_schedule':
+    case 'interview':
+      return { text: 'Interview Scheduled', color: Colors.primary };
     case 'selected':
       return { text: 'Selected', color: Colors.success };
     case 'hired':
       return { text: 'Hired', color: Colors.success };
     default:
       return {
-        text: status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Applied',
+        text: status ? status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ') : 'Applied',
         color: Colors.primary
       };
   }
@@ -61,10 +64,28 @@ const formatAppliedDate = (dateStr: string) => {
   }
 };
 
+const formatTo12Hour = (timeStr: string) => {
+  if (!timeStr) return 'N/A';
+  try {
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      let hours = parseInt(parts[0]);
+      const minutes = parts[1];
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // the hour '0' should be '12'
+      return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    }
+  } catch (e) {
+    console.log('Error formatting time:', e);
+  }
+  return timeStr;
+};
+
 const AppliedJobsScreen = ({ navigation }: any) => {
   const dispatch = useDispatch<any>();
   const { appliedJobs, loading } = useSelector((state: any) => state.candidateJobs);
-
+  console.log('appliedJobs', appliedJobs)
   useEffect(() => {
     dispatch(fetchAppliedJobsSlice());
   }, [dispatch]);
@@ -77,10 +98,14 @@ const AppliedJobsScreen = ({ navigation }: any) => {
       return {
         id: app.id,
         status: statusDetails.text,
+        rawStatus: app.status,
         statusColor: statusDetails.color,
         appliedAt: formattedDate,
         job: normalizedJob,
-      };
+        interviewDate: app.interview_date,
+        interviewTime: formatTo12Hour(app.interview_time),
+        interviewType: app.interview_type,
+      };  
     });
   }, [appliedJobs]);
 
@@ -123,23 +148,46 @@ const AppliedJobsScreen = ({ navigation }: any) => {
               {normalizedApplications.length} {normalizedApplications.length === 1 ? 'job' : 'jobs'} applied
             </Text>
 
-            {normalizedApplications.map((application: any) => (
-              <View key={application.id} style={styles.applicationBlock}>
-                <AppliedJobCard
-                  title={application.job.title}
-                  company={application.job.company}
-                  logo={application.job.logo}
-                  location={application.job.location}
-                  salary={application.job.salary}
-                  type={application.job.job_type || application.job.type}
-                  status={application.status}
-                  statusColor={application.statusColor}
-                  appliedAt={application.appliedAt}
-                // onPress={() => navigation.navigate('JobDetails', { job: application.job })}
-                // onPress={() => navigation.navigate('JobDetails', { job: application.job })}
-                />
-              </View>
-            ))}
+            {normalizedApplications.map((application: any) => {
+              const showInterview = application.rawStatus?.toLowerCase() === 'interview_schedule' || 
+                                    application.rawStatus?.toLowerCase() === 'interview';
+              return (
+                <View key={application.id} style={styles.applicationBlock}>
+                  <AppliedJobCard
+                    title={application.job.title}
+                    company={application.job.company}
+                    logo={application.job.logo}
+                    location={application.job.location}
+                    salary={application.job.salary}
+                    type={application.job.job_type || application.job.type}
+                    status={application.status}
+                    statusColor={application.statusColor}
+                    appliedAt={application.appliedAt}
+                  />
+                  {showInterview && (
+                    <View style={styles.interviewDetailsCard}>
+                      <Text style={styles.interviewDetailsTitle}>Interview Scheduled</Text>
+                      <View style={styles.interviewDetailsGrid}>
+                        <View style={styles.interviewDetailRow}>
+                          <Text style={styles.interviewDetailLabel}>Type: </Text>
+                          <Text style={styles.interviewDetailVal}>
+                            {application.interviewType ? (application.interviewType.charAt(0).toUpperCase() + application.interviewType.slice(1)) : 'N/A'}
+                          </Text>
+                        </View>
+                        <View style={styles.interviewDetailRow}>
+                          <Text style={styles.interviewDetailLabel}>Date: </Text>
+                          <Text style={styles.interviewDetailVal}>{application.interviewDate || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.interviewDetailRow}>
+                          <Text style={styles.interviewDetailLabel}>Time: </Text>
+                          <Text style={styles.interviewDetailVal}>{application.interviewTime || 'N/A'}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
             <View style={{ height: hp('5%') }} />
           </ScrollView>
         )}
@@ -214,6 +262,41 @@ const styles = StyleSheet.create({
   exploreBtnText: {
     color: Colors.white,
     fontSize: RFValue(11),
+    fontWeight: '700',
+  },
+  interviewDetailsCard: {
+    backgroundColor: '#F5F7FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: wp('2.5%'),
+    padding: wp('3%'),
+    marginTop: -hp('0.6%'),
+    marginBottom: hp('1.2%'),
+  },
+  interviewDetailsTitle: {
+    fontSize: RFValue(9.5),
+    fontWeight: '800',
+    color: '#3730A3',
+    marginBottom: hp('0.6%'),
+  },
+  interviewDetailsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: wp('2%'),
+  },
+  interviewDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  interviewDetailLabel: {
+    fontSize: RFValue(8.2),
+    color: '#4338CA',
+    fontWeight: '600',
+  },
+  interviewDetailVal: {
+    fontSize: RFValue(8.2),
+    color: '#1E1B4B',
     fontWeight: '700',
   },
 });

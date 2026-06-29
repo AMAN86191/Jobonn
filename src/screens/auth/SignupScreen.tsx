@@ -113,12 +113,11 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         setOtpError(errorMsg);
         Toast.show({
           type: 'error',
-          text1: 'Verification Failed',
+          text1: 'Verification Failed',                                                                                                                                                                                                                                                                                                   
           text2: errorMsg,
         });
         return;
       }
-
       // Store company_id or candidate_id from successful verification
       if (resOtpVerify?.company_id) {
         setCompanyId(resOtpVerify.company_id);

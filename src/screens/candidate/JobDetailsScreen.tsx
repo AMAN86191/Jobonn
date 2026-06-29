@@ -15,6 +15,9 @@ import { jobs } from '../../data/jobonnStaticData';
 import { logJobView, logCompanyProfileView } from '../../services/firebase/analytics';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCandidateProfileCompleteness } from '../../utils/candidateProfileCompleteness';
+import Toast from 'react-native-toast-message';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -25,6 +28,22 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
     if ('workMode' in rawJob) return rawJob;
     return normalizeBackendJob(rawJob);
   }, [rawJob]);
+
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('userData');
+        if (stored) {
+          setUser(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.log('Failed to load user in JobDetailsScreen:', e);
+      }
+    };
+    loadUser();
+  }, []);
 
   const tabs = useMemo(() => {
     const list = ['Job Details'];
@@ -274,7 +293,19 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
           style={[styles.applyBtn, applyAnimStyle]}
           onPressIn={() => applyScale.value = withSpring(0.96)}
           onPressOut={() => applyScale.value = withSpring(1)}
-          onPress={() => navigation.navigate('ApplyJobFlow', { job })}
+          onPress={() => {
+
+            const completeness = getCandidateProfileCompleteness(user);
+            if (completeness.percentage < 90) {
+              Toast.show({
+                type: 'error',
+                text1: 'Profile Incomplete',
+                text2: `Please complete your profile to apply (Current progress: ${completeness.percentage}%). Minimum 90% required.`,
+              });
+              return;
+            }
+            navigation.navigate('ApplyJobFlow', { job });
+          }}
         >
           <Send color={Colors.white} size={RFValue(11)} style={{ marginRight: wp('1%') }} />
           <View style={styles.applyBtnTextContainer}>

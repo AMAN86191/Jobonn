@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
 import { Home, Briefcase, Users, Calendar, User, LogOut, X, Mail, ChevronRight, FileText, BarChart3, CreditCard, FileClock } from 'lucide-react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
@@ -15,7 +16,7 @@ const managerDrawerItems = [
   { label: 'Jobs', icon: Briefcase, routeName: 'ManagerJobsTab' },
   { label: 'Applicants', icon: Users, routeName: 'ManagerApplicantsTab' },
   { label: 'Profile', icon: User, routeName: 'ManagerProfileTab' },
-  { label: 'Reports', icon: BarChart3, routeName: 'ManagerAnalytics', root: true },
+  // { label: 'Reports', icon: BarChart3, routeName: 'ManagerAnalytics', root: true },
   { label: 'Packages', icon: CreditCard, routeName: 'PackageManagement', root: true },
   { label: 'Schedule Interviews', icon: Calendar, routeName: 'ManagerInterviewsTab' },
   { label: 'Terms & Conditions', icon: FileText, routeName: 'TermsAndConditions', root: true },
@@ -33,6 +34,7 @@ const candidateDrawerItems = [
 
 export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
   const { navigation, state } = props;
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<any>(null);
   const dispatch = useDispatch();
   const drawerStatus = useDrawerStatus();
@@ -50,6 +52,21 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
 
   const name = user?.name || (isCandidate ? 'User' : 'Company');
   const email = user?.email || (isCandidate ? 'user@gmail.com' : 'company@jobonn.com');
+
+  const profileImage = (() => {
+    if (isCandidate) {
+      const img = user?.candidate?.docs?.profile_img || user?.candidate?.profile_img || user?.candidate?.profile_image;
+      if (img) {
+        return img.startsWith('http') ? img : `https://admin.jobonn.in/storage/${img}`;
+      }
+    } else {
+      const logo = user?.company?.company_logo || user?.company_logo;
+      if (logo) {
+        return logo.startsWith('http') ? logo : `https://admin.jobonn.in/storage/${logo}`;
+      }
+    }
+    return null;
+  })();
 
   const nestedState = state.routes[0]?.state;
   const activeTabName = nestedState
@@ -122,7 +139,11 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
       <View style={styles.header}>
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{name[0]?.toUpperCase()}</Text>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{name[0]?.toUpperCase()}</Text>
+            )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.nameText} numberOfLines={1}>{name}</Text>
@@ -177,7 +198,7 @@ export const CustomDrawerContent = (props: DrawerContentComponentProps) => {
       </View>
 
       {/* Drawer Footer / Logout */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, hp('5%')) }]}>
         <View style={styles.divider} />
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <LogOut size={RFValue(14)} color={Colors.danger} />
@@ -215,6 +236,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: RFValue(18),
     fontWeight: '700',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: wp('5.5%'),
   },
   profileInfo: {
     flex: 1,
@@ -293,7 +319,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: wp('4%'),
-    paddingBottom: hp('4%'),
   },
   logoutBtn: {
     flexDirection: 'row',

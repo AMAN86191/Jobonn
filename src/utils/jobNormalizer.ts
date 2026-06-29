@@ -66,17 +66,15 @@ export const normalizeBackendJob = (job: any): any => {
   }
 
   // Work mode extraction
-  let workModeStr = '';
+  let workModeStr = 'On-site';
   if (job.work_mode) {
     workModeStr = job.work_mode;
   } else if (job.workMode) {
     workModeStr = job.workMode;
-  } else if (job.job_type === 'remote') {
+  } else if (job.job_type === 'remote' || job.job_type?.toLowerCase() === 'remote') {
     workModeStr = 'Remote';
-  } else if (job.job_description && job.job_description.toLowerCase().includes('remote')) {
-    workModeStr = 'Remote';
-  } else if (job.benefits && job.benefits.toLowerCase().includes('remote')) {
-    workModeStr = 'Remote';
+  } else if (job.job_type === 'hybrid' || job.job_type?.toLowerCase() === 'hybrid') {
+    workModeStr = 'Hybrid';
   }
 
   // Split benefits string to array
