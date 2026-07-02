@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import {  PenTool, Building, Users, MapPin, CheckCircle, IndianRupee, Briefcase } from 'lucide-react-native';
+import { PenTool, Building, Users, MapPin, CheckCircle, IndianRupee, Briefcase } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
 import { RFValue } from 'react-native-responsive-fontsize';
 import JobCard from './JobCard';
@@ -127,7 +127,7 @@ export const AboutCompanyTabContent = ({ job }: { job?: any }) => {
         {!!job?.location && (
           <View style={styles.infoRow}>
             <MapPin color={Colors.textSecondary} size={RFValue(14)} />
-            <Text style={styles.infoText}>{job.location}</Text>
+            <Text style={styles.infoText}>{job?.rawJob?.company?.office_location}</Text>
           </View>
         )}
       </View>

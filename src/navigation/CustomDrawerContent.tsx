@@ -14,7 +14,8 @@ import Toast from 'react-native-toast-message';
 const managerDrawerItems = [
   { label: 'Home', icon: Home, routeName: 'ManagerHomeTab' },
   { label: 'Jobs', icon: Briefcase, routeName: 'ManagerJobsTab' },
-  { label: 'Applicants', icon: Users, routeName: 'ManagerApplicantsTab' },
+  // { label: 'Applicants', icon: Users, routeName: 'ManagerApplicantsTab' },
+  { label: 'Recommended / Invites', icon: Users, routeName: 'RecommendedCandidates', root: true },
   { label: 'Profile', icon: User, routeName: 'ManagerProfileTab' },
   // { label: 'Reports', icon: BarChart3, routeName: 'ManagerAnalytics', root: true },
   { label: 'Packages', icon: CreditCard, routeName: 'PackageManagement', root: true },

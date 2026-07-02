@@ -44,14 +44,14 @@ const JobCard: React.FC<JobCardProps> = ({
           {!!company && <Text style={styles.company} numberOfLines={1}>{company}</Text>}
           <Text style={styles.title} numberOfLines={2}>{title}</Text>
         </View>
-        <Pressable onPress={handleSave} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+        {/* <Pressable onPress={handleSave} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <Bookmark
             color={saved ? Colors.primary : Colors.textTertiary}
             fill={saved ? Colors.primary : 'transparent'}
             size={RFValue(13)}
             strokeWidth={2}
           />
-        </Pressable>
+        </Pressable> */}
       </View>
 
       {hasTags ? (

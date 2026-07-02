@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Pressable } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { Building2, MapPin, Check, X } from 'lucide-react-native';
 import { Colors } from '../../theme/Colors';
@@ -14,13 +14,14 @@ interface InviteCardProps {
   status: 'pending' | 'accepted' | 'shortlisted' | 'rejected';
   onAccept?: () => void;
   onReject?: () => void;
+  onPress?: () => void;
 }
 
 const InviteCard: React.FC<InviteCardProps> = ({ 
-  company, role, logo, location, status, onAccept, onReject 
+  company, role, logo, location, status, onAccept, onReject, onPress 
 }) => {
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           {logo ? (
@@ -69,7 +70,7 @@ const InviteCard: React.FC<InviteCardProps> = ({
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 };
 

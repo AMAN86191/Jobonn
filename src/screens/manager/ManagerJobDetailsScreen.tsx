@@ -284,7 +284,6 @@ const ManagerJobDetailsScreen = ({ navigation, route }: any) => {
   const filtered = useMemo(() => {
     return normalizedApplicants.filter(a => a.atsStage === activeTab || a.status === activeTab);
   }, [normalizedApplicants, activeTab]);
-
   const stats = [
     { label: 'Applicants', value: job.applicants?.toString() || '0', icon: Users, color: Colors.primary },
     { label: 'Shortlisted', value: job.shortlisted?.toString() || '0', icon: UserCheck, color: Colors.success },
@@ -321,9 +320,9 @@ const ManagerJobDetailsScreen = ({ navigation, route }: any) => {
 
         <View style={styles.applicantsHeader}>
           <Text style={styles.sectionTitle}>Applicants ({filtered.length})</Text>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)}>
+          {/* <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)}>
             <Filter color={Colors.textSecondary} size={RFValue(10)} strokeWidth={2} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsContent}>

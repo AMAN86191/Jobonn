@@ -52,7 +52,7 @@ import { contactCredits } from '../../data/jobonnStaticData';
 import { getAppliedCandidateDetail } from '../../api/CompanyHomeProvider';
 import { normalizeCandidateProfile } from '../../utils/candidateProfileUtils';
 import { useDispatch } from 'react-redux';
-import { unlockCandidateContactSlice, updateHiringProcessSlice } from '../../redux/CompanyHomeSlice';
+import { unlockCandidateContactSlice, updateHiringProcessSlice, getRecommendedCandidateDetailSlice, sendJobInviteSlice } from '../../redux/CompanyHomeSlice';
 import Toast from 'react-native-toast-message';
 
 const JOBS_LIST = [
@@ -110,6 +110,23 @@ const parseTimeString = (timeStr: string) => {
   return timeStr;
 };
 
+const extractMatchedSkills = (reasons: string[]) => {
+  if (!reasons || !Array.isArray(reasons)) return [];
+  const skillsSet = new Set<string>();
+  reasons.forEach(reason => {
+    if (reason.toLowerCase().startsWith('skill match:')) {
+      const skillName = reason.substring(12).trim();
+      if (skillName) skillsSet.add(skillName);
+    } else {
+      const match = reason.match(/Skill\s+'([^']+)'/i);
+      if (match && match[1]) {
+        skillsSet.add(match[1].trim());
+      }
+    }
+  });
+  return Array.from(skillsSet);
+};
+
 const CandidateApplicationFullView = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
@@ -163,7 +180,12 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
         });
 
         if (status === 'interview_schedule') {
-          navigation.navigate('ManagerInterviews');
+          navigation.navigate('ManagerHome', {
+            screen: 'ManagerTabNavigator',
+            params: {
+              screen: 'ManagerInterviewsTab',
+            },
+          } as any);
         }
       } else {
         Toast.show({
@@ -191,6 +213,7 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
   };
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [selectedJob, setSelectedJob] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
   const [contactUnlocked, setContactUnlocked] = useState(!!applicant?.contactUnlocked);
   const [creditsRemaining, setCreditsRemaining] = useState(contactCredits.remaining);
 
@@ -205,17 +228,20 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
       }
       try {
         setLoading(true);
-        const res = await getAppliedCandidateDetail(applicant.candidate_id);
-        console.log('getAppliedCandidateDetail response:', res);
-        if (res?.status && res?.candidate) {
-          const { normalizedProfile, normalizedPersonalDetails } = normalizeCandidateProfile(res.candidate);
+        const res = route.params?.isRecommended
+          ? await dispatch(getRecommendedCandidateDetailSlice(applicant.candidate_id) as any).unwrap()
+          : await getAppliedCandidateDetail(applicant.candidate_id);
+        console.log('Candidate detail response:', res);
+        const candidateData = res?.candidate || res?.data || res;
+        if (candidateData) {
+          const { normalizedProfile, normalizedPersonalDetails } = normalizeCandidateProfile(candidateData);
           setDetailData({
-            ...res.candidate,
+            ...candidateData,
             normalizedProfile,
             normalizedPersonalDetails,
             applications: res.applications || []
           });
-          if (res.is_viewed === true) {
+          if (res?.is_viewed || res?.candidate?.is_viewed === true) {
             setContactUnlocked(true);
           } else {
             setContactUnlocked(false);
@@ -228,27 +254,28 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
       }
     };
     fetchDetail();
-  }, [applicant?.candidate_id]);
+  }, [applicant?.candidate_id, route.params?.isRecommended]);
 
-  const isFresher = (exp: string) => {
-    if (!exp) return true;
-    const lowercaseExp = exp.toLowerCase();
-    if (lowercaseExp.includes('fresher')) return true;
-    if (lowercaseExp.includes('0 years') || lowercaseExp.includes('0 yrs')) {
-      if (lowercaseExp.includes('0 months') || lowercaseExp.includes('0 mos') || !lowercaseExp.includes('month')) {
-        return true;
-      }
-    }
-    return false;
-  };
 
   const displayApplicant = useMemo(() => {
+    const cleanCTC = (val: any) => {
+      if (val === undefined || val === null || val === '' || String(val).toLowerCase() === 'null') {
+        return 'Not Disclosed';
+      }
+      const str = String(val).replace(/lpa/gi, '').trim();
+      const num = parseFloat(str);
+      if (!isNaN(num)) {
+        return `${num} LPA`;
+      }
+      return val;
+    };
+
     if (!detailData) {
       return {
         ...applicant,
         experience: applicant.experience || '',
-        currentCTC: applicant.currentCTC || 'Not Disclosed',
-        expectedCTC: applicant.expectedCTC || 'Not Disclosed',
+        currentCTC: cleanCTC(applicant.currentCTC),
+        expectedCTC: cleanCTC(applicant.expectedCTC),
         noticePeriod: applicant.noticePeriod || '',
         preferredLocation: applicant.preferredLocation || applicant.location || 'Not Specified',
         jobType: applicant.jobType || applicant.preferred_job_types || 'Not Specified',
@@ -279,8 +306,8 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
       role: prof.jobTitle || applicant.role || '',
       experience: displayExp,
       location: prof.currentLocation || applicant.location || '',
-      currentCTC: (prof.currentCTC && prof.currentCTC !== 'null') ? (String(prof.currentCTC).toLowerCase().includes('lpa') ? prof.currentCTC : `${prof.currentCTC} LPA`) : (applicant.currentCTC || 'Not Disclosed'),
-      expectedCTC: (prof.expectedCTC && prof.expectedCTC !== 'null') ? prof.expectedCTC : (applicant.expectedCTC || 'Not Disclosed'),
+      currentCTC: (prof.currentCTC && prof.currentCTC !== 'null') ? cleanCTC(prof.currentCTC) : cleanCTC(applicant.currentCTC),
+      expectedCTC: (prof.expectedCTC && prof.expectedCTC !== 'null') ? cleanCTC(prof.expectedCTC) : cleanCTC(applicant.expectedCTC),
       noticePeriod: prof.noticePeriod || applicant.noticePeriod || '',
       preferredLocation: prof.preferredLocation || applicant.preferredLocation || applicant.location || 'Not Specified',
       jobType: prof.jobType || applicant.jobType || applicant.preferred_job_types || 'Not Specified',
@@ -299,7 +326,6 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
       answers: answers,
     };
   }, [applicant, detailData]);
-  console.log('displayApplicant', displayApplicant)
   const hometownVal = useMemo(() => {
     if (!detailData?.personal_detail) {
       return displayApplicant.hometown || '-';
@@ -312,17 +338,71 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
     return city || state || '-';
   }, [detailData, displayApplicant.hometown]);
 
-  const handleSendInvite = () => {
+  const handleSendInvite = async () => {
     if (!selectedJob) {
       Alert.alert('Required', 'Please select a job post.');
       return;
     }
-    setInviteModalVisible(false);
-    Alert.alert(
-      'Success',
-      `Invitation sent to ${displayApplicant.name} for the post of ${selectedJob}!`
+
+    const candidateId = displayApplicant.candidate_id || displayApplicant.id || applicant?.candidate_id;
+    const selectedJobObj = detailData?.matched_jobs?.find(
+      (match: any) => match.job_title === selectedJob
     );
-    setSelectedJob('');
+    const jobId = selectedJobObj?.job_id || selectedJobObj?.id;
+
+    if (!candidateId || !jobId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Candidate ID or Job ID not found',
+      });
+      return;
+    }
+
+    try {
+      setSendingInvite(true);
+      const response = await dispatch(
+        sendJobInviteSlice({ candidate_id: candidateId, job_id: jobId }) as any
+      ).unwrap();
+      console.log('Job invite response:', response);
+
+      if (
+        response &&
+        (response.status === true ||
+          response.status_code === 200 ||
+          response.status_code === '200' ||
+          response.status === 'success')
+      ) {
+        setInviteModalVisible(false);
+        Toast.show({
+          type: 'success',
+          text1: 'Invite Sent',
+          text2: `Invitation sent to ${displayApplicant.name} for the post of ${selectedJob}!`,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Invite Failed',
+          text2: response?.message || 'Failed to send job invitation',
+        });
+      }
+    } catch (error: any) {
+      console.log('Send invite error:', error);
+      let errorMsg = 'Failed to send invite';
+      if (typeof error === 'string') {
+        errorMsg = error;
+      } else if (error && typeof error === 'object') {
+        errorMsg = error.message || error.error || 'Failed to send invite';
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Invite Failed',
+        text2: errorMsg,
+      });
+    } finally {
+      setSendingInvite(false);
+      setSelectedJob('');
+    }
   };
 
   if (!applicant) return null;
@@ -453,6 +533,25 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               {displayApplicant.summary || 'Not Provided'}
             </Text>
           </RAnimated.View>
+
+          {/* Matching Jobs Section Card */}
+          {detailData?.matched_jobs && detailData.matched_jobs.length > 0 && (
+            <RAnimated.View entering={FadeInDown.duration(400).delay(265)} style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Target size={RFValue(11)} color={Colors.primary} />
+                  <Text style={styles.sectionCardTitle}>Matching Jobs</Text>
+                </View>
+              </View>
+              <View style={styles.matchChipsContainer}>
+                {detailData.matched_jobs.map((match: any, index: number) => (
+                  <View key={index} style={styles.matchSkillChip}>
+                    <Text style={styles.matchSkillChipText}>{match.job_title}</Text>
+                  </View>
+                ))}
+              </View>
+            </RAnimated.View>
+          )}
 
           {/* Interview Scheduled Banner */}
           {isInterviewScheduled && (
@@ -667,14 +766,8 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               onPress={() => handleUpdateHiringStatus('rejected')}
               disabled={updatingStatus}
             >
-              {updatingStatus ? (
-                <ActivityIndicator size="small" color={Colors.danger} />
-              ) : (
-                <>
-                  <XCircle color={Colors.danger} size={RFValue(10)} />
-                  <Text style={styles.rejectBtnText}>Reject</Text>
-                </>
-              )}
+              <XCircle color={Colors.danger} size={RFValue(10)} />
+              <Text style={styles.rejectBtnText}>Reject</Text>
             </TouchableOpacity>
 
             {showHireBtn ? (
@@ -758,8 +851,10 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
         transparent
         visible={inviteModalVisible}
         onRequestClose={() => {
-          setInviteModalVisible(false);
-          setSelectedJob('');
+          if (!sendingInvite) {
+            setInviteModalVisible(false);
+            setSelectedJob('');
+          }
         }}
       >
         <View style={styles.modalOverlay}>
@@ -767,6 +862,7 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Job Post</Text>
               <TouchableOpacity
+                disabled={sendingInvite}
                 onPress={() => {
                   setInviteModalVisible(false);
                   setSelectedJob('');
@@ -782,7 +878,7 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               </Text>
               <View style={{ zIndex: 10, elevation: 10, marginVertical: hp('1.5%') }}>
                 <SearchableDropdown
-                  data={JOBS_LIST}
+                  data={detailData?.matched_jobs?.map((match: any) => match.job_title).filter(Boolean) || []}
                   placeholder="Select a Job Post"
                   value={selectedJob}
                   onSelect={(val) => setSelectedJob(val)}
@@ -800,6 +896,7 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.cancelBtn}
+                disabled={sendingInvite}
                 onPress={() => {
                   setInviteModalVisible(false);
                   setSelectedJob('');
@@ -811,12 +908,16 @@ const CandidateApplicationFullView = ({ navigation, route }: any) => {
               <TouchableOpacity
                 style={[
                   styles.confirmBtn,
-                  !selectedJob && { backgroundColor: Colors.border }
+                  (!selectedJob || sendingInvite) && { backgroundColor: Colors.border }
                 ]}
-                disabled={!selectedJob}
+                disabled={!selectedJob || sendingInvite}
                 onPress={handleSendInvite}
               >
-                <Text style={styles.confirmBtnText}>Send Invite</Text>
+                {sendingInvite ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Send Invite</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1252,6 +1353,78 @@ const styles = StyleSheet.create({
     color: '#047857',
     fontSize: RFValue(10.5),
     fontWeight: '700',
+  },
+  matchItemContainer: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 8,
+    padding: wp('3.5%'),
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    marginBottom: hp('1%'),
+  },
+  matchHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp('1%'),
+  },
+  matchJobTitle: {
+    fontSize: RFValue(10.5),
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    flex: 1,
+    marginRight: wp('2%'),
+  },
+  matchScoreBadge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: wp('2.5%'),
+    paddingVertical: hp('0.4%'),
+    borderRadius: 12,
+  },
+  matchScoreText: {
+    color: Colors.white,
+    fontSize: RFValue(8),
+    fontWeight: '700',
+  },
+  matchReasonsList: {
+    gap: hp('0.6%'),
+  },
+  reasonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp('2%'),
+  },
+  reasonBullet: {
+    width: wp('1.2%'),
+    height: wp('1.2%'),
+    borderRadius: wp('0.6%'),
+    backgroundColor: Colors.primary,
+  },
+  reasonText: {
+    fontSize: RFValue(9),
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    lineHeight: RFValue(12),
+  },
+  matchChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp('1.5%'),
+    marginTop: hp('0.6%'),
+    marginBottom: hp('1%'),
+  },
+  matchSkillChip: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 6,
+    paddingHorizontal: wp('2.2%'),
+    paddingVertical: hp('0.3%'),
+  },
+  matchSkillChipText: {
+    fontSize: RFValue(8),
+    fontWeight: '700',
+    color: '#4F46E5',
   },
 });
 

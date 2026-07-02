@@ -7,6 +7,8 @@ import {
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Modal,
 } from 'react-native';
 import { getAllScheduledInterviews } from '../../api/CompanyHomeProvider';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
@@ -16,7 +18,8 @@ import {
   Video,
   Clock,
   MapPin,
-  CalendarClock
+  CalendarClock,
+  X,
 } from 'lucide-react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
 import { Colors } from '../../theme/Colors';
@@ -113,6 +116,8 @@ const ManagerInterviewsScreen = ({ navigation }: any) => {
   const [updating, setUpdating] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedInterviewId, setSelectedInterviewId] = useState<string | null>(null);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [selectedCancelInterview, setSelectedCancelInterview] = useState<any>(null);
 
   const fetchInterviews = async () => {
     setLoading(true);
@@ -245,6 +250,51 @@ const ManagerInterviewsScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleCancelInterview = (interview: any) => {
+    setSelectedCancelInterview(interview);
+    setCancelModalVisible(true);
+  };
+
+  const performCancelInterview = async (interview: any) => {
+    const candidateId = interview.candidate_id;
+    const applicationId = interview.id;
+    const payload = {
+      status: 'pending',
+      interview_status: 'canceled',
+    };
+
+    try {
+      setUpdating(true);
+      console.log('Canceling interview via API:', { candidateId, applicationId, payload });
+      const response = await dispatch(updateHiringProcessSlice({ candidateId, applicationId, payload }) as any).unwrap();
+      console.log('Cancel response:', response);
+
+      if (response && (response.status === true || response.status_code === 200 || response.status_code === '200')) {
+        Toast.show({
+          type: 'success',
+          text1: 'Interview Cancelled',
+          text2: 'The interview has been successfully cancelled.',
+        });
+        fetchInterviews();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Cancel Failed',
+          text2: response?.message || 'Failed to cancel interview',
+        });
+      }
+    } catch (e: any) {
+      console.log('Error canceling interview:', e);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: e?.message || 'Something went wrong',
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#FDFDFD" />
@@ -306,17 +356,6 @@ const ManagerInterviewsScreen = ({ navigation }: any) => {
                     </View>
                     <Text style={styles.candidateRole}>{interview.role}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.rescheduleBtn}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setSelectedInterviewId(interview.id);
-                      setModalVisible(true);
-                    }}
-                  >
-                    <CalendarClock size={RFValue(10.5)} color={Colors.textSecondary} strokeWidth={2.5} />
-                    <Text style={styles.rescheduleTxt}>Reschedule</Text>
-                  </TouchableOpacity>
                 </View>
 
                 {/* Details Box */}
@@ -357,6 +396,32 @@ const ManagerInterviewsScreen = ({ navigation }: any) => {
                   </View>
                 </View>
 
+                {/* Actions Row */}
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={styles.rescheduleBtn}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedInterviewId(interview.id);
+                      setModalVisible(true);
+                    }}
+                  >
+                    <CalendarClock size={RFValue(10.5)} color={Colors.textSecondary} strokeWidth={2.5} />
+                    <Text style={styles.rescheduleTxt}>Reschedule</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      handleCancelInterview(interview);
+                    }}
+                  >
+                    <X size={RFValue(10.5)} color={Colors.danger} strokeWidth={2.5} />
+                    <Text style={styles.cancelTxt}>Cancel Interview</Text>
+                  </TouchableOpacity>
+                </View>
+
               </RAnimated.View>
             </TouchableOpacity>
           ))
@@ -371,6 +436,48 @@ const ManagerInterviewsScreen = ({ navigation }: any) => {
         onClose={() => setModalVisible(false)}
         onConfirm={handleRescheduleConfirm}
       />
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        visible={cancelModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModalContent}>
+            <View style={styles.warningIconBg}>
+              <X size={RFValue(24)} color={Colors.danger} strokeWidth={2.5} />
+            </View>
+            <Text style={styles.confirmTitle}>Cancel Interview</Text>
+            <Text style={styles.confirmDesc}>
+              Are you sure you want to cancel the scheduled interview for{' '}
+              <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
+                {selectedCancelInterview?.candidateName}
+              </Text>?
+            </Text>
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setCancelModalVisible(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>No, Keep</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={() => {
+                  setCancelModalVisible(false);
+                  if (selectedCancelInterview) {
+                    performCancelInterview(selectedCancelInterview);
+                  }
+                }}
+              >
+                <Text style={styles.modalConfirmBtnText}>Yes, Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -486,11 +593,13 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     gap: wp('2.5%'),
+    paddingHorizontal: wp('1.5%'),
+    marginBottom: hp('1%'),
   },
   rescheduleBtn: {
+    flex: 1,
     flexDirection: 'row',
-    paddingVertical: hp('0.5%'),
-    paddingHorizontal: hp('0.5%'),
+    paddingVertical: hp('0.8%'),
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp('1.5%'),
@@ -500,6 +609,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   rescheduleTxt: { fontSize: RFValue(9), color: Colors.textSecondary, fontWeight: '700' },
+  cancelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: hp('0.8%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp('1.5%'),
+    borderRadius: wp('1.5%'),
+    borderWidth: 1,
+    borderColor: Colors.danger + '30',
+    backgroundColor: Colors.white,
+  },
+  cancelTxt: { fontSize: RFValue(9), color: Colors.danger, fontWeight: '700' },
   startBtn: {
     flex: 1.6,
     flexDirection: 'row',
@@ -599,6 +721,80 @@ const styles = StyleSheet.create({
     fontSize: RFValue(11),
     color: Colors.textPrimary,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmModalContent: {
+    width: wp('85%'),
+    backgroundColor: Colors.white,
+    borderRadius: wp('4%'),
+    padding: wp('6%'),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  warningIconBg: {
+    width: wp('14%'),
+    height: wp('14%'),
+    borderRadius: wp('7%'),
+    backgroundColor: Colors.danger + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp('1.5%'),
+  },
+  confirmTitle: {
+    fontSize: RFValue(13),
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: hp('1%'),
+  },
+  confirmDesc: {
+    fontSize: RFValue(9.5),
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: hp('2.2%'),
+    marginBottom: hp('3%'),
+    paddingHorizontal: wp('2%'),
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: wp('3%'),
+    width: '100%',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: hp('1.2%'),
+    borderRadius: wp('2%'),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+  },
+  modalCancelBtnText: {
+    fontSize: RFValue(10),
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: hp('1.2%'),
+    borderRadius: wp('2%'),
+    backgroundColor: Colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalConfirmBtnText: {
+    fontSize: RFValue(10),
+    fontWeight: '700',
+    color: Colors.white,
   },
 });
 

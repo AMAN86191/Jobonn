@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getCandidateJobs, applyJob, getAppliedJobs } from '../api/CandidateJobProvider';
+import { getCandidateJobs, applyJob, getAppliedJobs, getCandidateInvitations, replyCandidateInvitation } from '../api/CandidateJobProvider';
 
 interface CandidateJobsState {
   loading: boolean;
@@ -23,9 +23,11 @@ const initialState: CandidateJobsState = {
 
 export const fetchCandidateJobsSlice = createAsyncThunk(
   'candidateJobs/fetchCandidateJobs',
-  async (page: number, { rejectWithValue }) => {
+  async (arg: number | { page: number; filters?: any }, { rejectWithValue }) => {
     try {
-      const response = await getCandidateJobs(page);
+      const page = typeof arg === 'number' ? arg : arg.page;
+      const filters = typeof arg === 'number' ? undefined : arg.filters;
+      const response = await getCandidateJobs(page, filters);
       return response;
     } catch (error) {
       return rejectWithValue(error);
@@ -51,6 +53,33 @@ export const fetchAppliedJobsSlice = createAsyncThunk(
     try {
       const response = await getAppliedJobs();
       return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const fetchCandidateInvitationsSlice = createAsyncThunk(
+  'candidateJobs/fetchCandidateInvitations',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getCandidateInvitations();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const replyCandidateInvitationSlice = createAsyncThunk(
+  'candidateJobs/replyCandidateInvitation',
+  async (
+    { invitationId, status }: { invitationId: number | string; status: 'accepted' | 'rejected' },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await replyCandidateInvitation(invitationId, { status });
+      return { invitationId, status, response };
     } catch (error) {
       return rejectWithValue(error);
     }

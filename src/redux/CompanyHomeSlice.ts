@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getCompanyPackages, packagePurchase, getCompanyProfile, getCompanyJobs, getAppliedCandidates, updateJobStatus, unlockCandidateContact, updateHiringProcess } from '../api/CompanyHomeProvider';
+import { getCompanyPackages, packagePurchase, getCompanyProfile, getCompanyJobs, getAppliedCandidates, updateJobStatus, unlockCandidateContact, updateHiringProcess, getRecommendedCandidates, getRecommendedCandidateDetail, sendJobInvite, getAllInvitations } from '../api/CompanyHomeProvider';
 
 interface CompanyHomeState {
   packages: any[];
@@ -79,9 +79,11 @@ export const getCompanyJobsSlice = createAsyncThunk(
 
 export const getAppliedCandidatesSlice = createAsyncThunk(
   'companyHome/getAppliedCandidatesSlice',
-  async (page: number, { rejectWithValue }) => {
+  async (arg: number | { page: number; filters?: any }, { rejectWithValue }) => {
     try {
-      const response = await getAppliedCandidates(page);
+      const page = typeof arg === 'number' ? arg : arg.page;
+      const filters = typeof arg === 'number' ? undefined : arg.filters;
+      const response = await getAppliedCandidates(page, filters);
       return response;
     } catch (error) {
       return rejectWithValue(error);
@@ -121,6 +123,54 @@ export const updateHiringProcessSlice = createAsyncThunk(
   ) => {
     try {
       const response = await updateHiringProcess(candidateId, applicationId, payload);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const getRecommendedCandidatesSlice = createAsyncThunk(
+  'companyHome/getRecommendedCandidatesSlice',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getRecommendedCandidates();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const getRecommendedCandidateDetailSlice = createAsyncThunk(
+  'companyHome/getRecommendedCandidateDetailSlice',
+  async (candidateId: number | string, { rejectWithValue }) => {
+    try {
+      const response = await getRecommendedCandidateDetail(candidateId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const sendJobInviteSlice = createAsyncThunk(
+  'companyHome/sendJobInviteSlice',
+  async (payload: { candidate_id: number | string; job_id: number | string }, { rejectWithValue }) => {
+    try {
+      const response = await sendJobInvite(payload);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const getAllInvitationsSlice = createAsyncThunk(
+  'companyHome/getAllInvitationsSlice',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getAllInvitations();
       return response;
     } catch (error) {
       return rejectWithValue(error);

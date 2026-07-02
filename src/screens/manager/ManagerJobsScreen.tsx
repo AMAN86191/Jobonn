@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, TextInput, Pressable, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { Search, SlidersHorizontal, Plus, ArrowLeft, ArrowRight } from 'lucide-react-native';
+import { Search, Plus, ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/Colors';
 import { RFValue } from 'react-native-responsive-fontsize';
@@ -58,7 +58,7 @@ const ManagerJobsScreen = ({ navigation }: any) => {
   const fetchJobs = async (pageNum: number, isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const res = await getCompanyJobs(pageNum);
+      const res = await getCompanyJobs(pageNum, activeTab);
       console.log('getCompanyJobs response:', res);
       const list = res?.jobs?.data || [];
       setRawJobs(list);
@@ -85,7 +85,7 @@ const ManagerJobsScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchJobs(page);
-  }, [page]);
+  }, [page, activeTab]);
 
   useEffect(() => {
     fetchCompanyProfile();
@@ -107,15 +107,15 @@ const ManagerJobsScreen = ({ navigation }: any) => {
       return;
     }
     // Check profile completeness (minimum 90% required to post job)
-     const completeness = getProfileCompleteness(companyProfile);
-     if (completeness.percentage < 90) {
-       Toast.show({
-         type: 'error',
-         text1: 'Profile Incomplete',
-         text2: `Complete your company profile to post a job (${completeness.percentage}% completed).`,
-       });
-       return;
-     }
+    const completeness = getProfileCompleteness(companyProfile);
+    if (completeness.percentage < 90) {
+      Toast.show({
+        type: 'error',
+        text1: 'Profile Incomplete',
+        text2: `Complete your company profile to post a job (${completeness.percentage}% completed).`,
+      });
+      return;
+    }
     const companyPackages = companyProfile?.company_packages || [];
     const activePackages = companyPackages.filter((p: any) => p.status === 'active');
     const activePackageObj = activePackages.length > 0
@@ -207,9 +207,9 @@ const ManagerJobsScreen = ({ navigation }: any) => {
             onChangeText={setSearch}
           />
         </View>
-        <Pressable style={styles.filterBtn} onPress={() => setFilterVisible(true)}>
+        {/* <Pressable style={styles.filterBtn} onPress={() => setFilterVisible(true)}>
           <SlidersHorizontal color={Colors.white} size={RFValue(11)} strokeWidth={2} />
-        </Pressable>
+        </Pressable> */}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow} contentContainerStyle={styles.tabsContent}>
@@ -217,7 +217,10 @@ const ManagerJobsScreen = ({ navigation }: any) => {
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
+            onPress={() => {
+              setActiveTab(tab);
+              setPage(1);
+            }}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
           </TouchableOpacity>
@@ -238,20 +241,27 @@ const ManagerJobsScreen = ({ navigation }: any) => {
       >
         {loading && normalizedJobs.length === 0 ? (
           <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('3%') }} />
-        ) : filtered.length > 0 ? (
+        ) : (
           <>
-            {filtered.map((job: any) => (
-              <ActiveJobCard
-                key={job.id}
-                title={job.title}
-                department={job.department}
-                location={job.location}
-                vacancies={job.openings}
-                applicants={job.applicants}
-                status={job.status}
-                onPress={() => navigation.navigate('ManagerJobDetails', { job })}
-              />
-            ))}
+            {filtered.length > 0 ? (
+              filtered.map((job: any) => (
+                <ActiveJobCard
+                  key={job.id}
+                  title={job.title}
+                  department={job.department}
+                  location={job.location}
+                  vacancies={job.openings}
+                  applicants={job.applicants}
+                  status={job.status}
+                  onPress={() => navigation.navigate('ManagerJobDetails', { job })}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No jobs found</Text>
+                <Text style={styles.emptyStateSubText}>Try adjusting your search or filters</Text>
+              </View>
+            )}
 
             {/* Pagination Controls */}
             {lastPage > 1 && (
@@ -280,11 +290,6 @@ const ManagerJobsScreen = ({ navigation }: any) => {
               </View>
             )}
           </>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No jobs found</Text>
-            <Text style={styles.emptyStateSubText}>Try adjusting your search or filters</Text>
-          </View>
         )}
         <View style={{ height: hp('12%') }} />
       </ScrollView>

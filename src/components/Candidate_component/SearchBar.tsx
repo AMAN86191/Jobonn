@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { Colors } from '../../theme/Colors';
@@ -25,9 +25,9 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = 'Search...', onSear
           value={value}
         />
       </View>
-      <Pressable style={styles.filterBtn} onPress={onFilterPress}>
+      <TouchableOpacity style={styles.filterBtn} onPress={onFilterPress} activeOpacity={0.7}>
         <SlidersHorizontal size={RFValue(11)} color={Colors.white} strokeWidth={2} />
-      </Pressable>
+      </TouchableOpacity>
     </View>
   );
 };

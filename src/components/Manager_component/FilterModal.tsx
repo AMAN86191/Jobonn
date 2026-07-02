@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, ScrollView, TextInput,
 } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { X, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { X, RotateCcw, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -36,6 +36,85 @@ interface FilterModalProps {
   onApply: () => void;
   onReset: () => void;
 }
+
+interface AnimatedArrowProps {
+  isExpanded: boolean;
+}
+
+const AnimatedArrow: React.FC<AnimatedArrowProps> = ({ isExpanded }) => {
+  const rotateValue = useSharedValue(0);
+
+  useEffect(() => {
+    rotateValue.value = withTiming(isExpanded ? 180 : 0, {
+      duration: 250,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+  }, [isExpanded]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotateValue.value}deg` }],
+    };
+  });
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <ChevronDown color={Colors.textSecondary} size={RFValue(12)} />
+    </Animated.View>
+  );
+};
+
+interface AnimatedDropdownProps {
+  isExpanded: boolean;
+  children: React.ReactNode;
+}
+
+const AnimatedDropdown: React.FC<AnimatedDropdownProps> = ({ isExpanded, children }) => {
+  const animatedHeight = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const [shouldRender, setShouldRender] = useState(isExpanded);
+
+  useEffect(() => {
+    if (isExpanded) {
+      setShouldRender(true);
+      animatedHeight.value = withTiming(hp('25%'), {
+        duration: 250,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+      opacity.value = withTiming(1, {
+        duration: 200,
+      });
+    } else {
+      opacity.value = withTiming(0, {
+        duration: 150,
+      });
+      animatedHeight.value = withTiming(0, {
+        duration: 250,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      }, (finished) => {
+        if (finished) {
+          runOnJS(setShouldRender)(false);
+        }
+      });
+    }
+  }, [isExpanded]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: animatedHeight.value,
+      opacity: opacity.value,
+      overflow: 'hidden',
+    };
+  });
+
+  if (!shouldRender) return null;
+
+  return (
+    <Animated.View style={[styles.dropdownContent, animatedStyle]}>
+      {children}
+    </Animated.View>
+  );
+};
 
 const FilterModal: React.FC<FilterModalProps> = ({
   visible, onClose, sections, selected, onSelect, onApply, onReset,
@@ -213,34 +292,52 @@ const FilterModal: React.FC<FilterModalProps> = ({
                         onBlur={() => {
                           setTimeout(() => {
                             setExpandedSections(prev => ({ ...prev, [section.title]: false }));
-                          }, 200);
+                          }, 250);
                         }}
                       />
-                      {expandedSections[section.title] ? <ChevronUp color={Colors.textSecondary} size={RFValue(12)} /> : <ChevronDown color={Colors.textSecondary} size={RFValue(12)} />}
+                      <Pressable
+                        onPress={() => {
+                          setExpandedSections(prev => ({
+                            ...prev,
+                            [section.title]: !prev[section.title]
+                          }));
+                        }}
+                        style={{ padding: wp('1.5%'), marginRight: -wp('1.5%') }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <AnimatedArrow isExpanded={!!expandedSections[section.title]} />
+                      </Pressable>
                     </View>
 
-                    {expandedSections[section.title] && (
-                      <View style={styles.dropdownContent}>
-                        <View style={styles.optionsRow}>
-                          {section.options
-                            .filter(opt => !selected[section.title]?.includes(opt.key))
-                            .filter(opt => opt.label.toLowerCase().includes((searchQueries[section.title] || '').toLowerCase()))
-                            .map(opt => (
+                    <AnimatedDropdown isExpanded={!!expandedSections[section.title]}>
+                      <ScrollView
+                        nestedScrollEnabled
+                        keyboardShouldPersistTaps="handled"
+                        style={{ width: '100%' }}
+                      >
+                        {section.options
+                          .filter(opt => opt.label.toLowerCase().includes((searchQueries[section.title] || '').toLowerCase()))
+                          .slice(0, 15)
+                          .map(opt => {
+                            const isSelected = selected[section.title]?.includes(opt.key);
+                            return (
                               <TouchableOpacity
                                 key={opt.key}
-                                style={styles.chip}
+                                style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
                                 onPress={() => {
                                   onSelect(section.title, opt.key);
-                                  setSearchQueries(prev => ({ ...prev, [section.title]: '' }));
                                 }}
                                 activeOpacity={0.7}
                               >
-                                <Text style={styles.chipText}>{opt.label}</Text>
+                                <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
+                                  {opt.label}
+                                </Text>
+                                {isSelected && <Check color={Colors.primary} size={RFValue(12)} />}
                               </TouchableOpacity>
-                            ))}
-                        </View>
-                      </View>
-                    )}
+                            );
+                          })}
+                      </ScrollView>
+                    </AnimatedDropdown>
                   </View>
                 ) : (
                   <View style={styles.optionsRow}>
@@ -436,8 +533,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dropdownContent: {
-    gap: hp('1%'),
+    backgroundColor: Colors.white,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: wp('2%'),
     marginTop: hp('0.5%'),
+    maxHeight: hp('25%'),
+  },
+  dropdownItem: {
+    paddingVertical: hp('1.2%'),
+    paddingHorizontal: wp('3%'),
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + '15',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+  },
+  dropdownItemActive: {
+    backgroundColor: Colors.primary + '05',
+  },
+  dropdownItemText: {
+    fontSize: RFValue(10),
+    color: Colors.textSecondary,
+  },
+  dropdownItemTextActive: {
+    color: Colors.primary,
+    fontWeight: '600',
   },
   searchBoxModal: {
     backgroundColor: Colors.background,
@@ -478,7 +600,7 @@ const styles = StyleSheet.create({
   },
   resetBtn: {
     flex: 0.8,
-    height: hp('5%'),
+    height: hp('4%'),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -490,7 +612,7 @@ const styles = StyleSheet.create({
   resetText: { fontSize: RFValue(11), color: Colors.textSecondary, fontWeight: '600' },
   applyBtn: {
     flex: 1.2,
-    height: hp('5%'),
+    height: hp('4%'),
     borderRadius: wp('2.5%'),
     backgroundColor: Colors.primary,
     justifyContent: 'center',

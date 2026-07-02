@@ -194,7 +194,7 @@ export const ProfileHeaderInfo = ({ user, profile, completenessValue, onEdit }: 
   );
 };
 
-export const StatsRow = ({ appliedJobsCount = 0 }: { appliedJobsCount?: number }) => (
+export const StatsRow = ({ appliedJobsCount = 0, views_count, interviews_count = 0 }: { appliedJobsCount?: number, views_count?: any, interviews_count?: number }) => (
   <View style={styles.statsRow}>
     <View style={styles.statCard}>
       <View style={[styles.statIconBox, { backgroundColor: Colors.primaryLight }]}>
@@ -202,34 +202,22 @@ export const StatsRow = ({ appliedJobsCount = 0 }: { appliedJobsCount?: number }
       </View>
       <Text style={styles.statCount}>{appliedJobsCount}</Text>
       <Text style={styles.statLabel}>Applied Jobs</Text>
-      <View style={styles.statTrendRow}>
-        <Text style={styles.statTrendText}>This week</Text>
-        <Text style={styles.statTrendPositive}>+18 <TrendingUp size={RFValue(7)} color={Colors.success} /></Text>
-      </View>
     </View>
 
-    <View style={styles.statCard}>
+     <View style={styles.statCard}>
       <View style={[styles.statIconBox, { backgroundColor: Colors.warningLight }]}>
         <Calendar size={RFValue(10)} color={Colors.warning} />
       </View>
-      <Text style={styles.statCount}>5</Text>
+      <Text style={styles.statCount}>{interviews_count}</Text>
       <Text style={styles.statLabel}>Interviews</Text>
-      <View style={styles.statTrendRow}>
-        <Text style={styles.statTrendText}>Upcoming</Text>
-        <Text style={styles.statTrendWarning}>2</Text>
-      </View>
-    </View>
+    </View> 
 
     <View style={styles.statCard}>
       <View style={[styles.statIconBox, { backgroundColor: Colors.infoLight }]}>
         <Eye size={RFValue(10)} color={Colors.info} />
       </View>
-      <Text style={styles.statCount}>136</Text>
+      <Text style={styles.statCount}>{views_count}</Text>
       <Text style={styles.statLabel}>Profile Views</Text>
-      <View style={styles.statTrendRow}>
-        <Text style={styles.statTrendText}>This week</Text>
-        <Text style={styles.statTrendPositive}>+18 <TrendingUp size={RFValue(7)} color={Colors.success} /></Text>
-      </View>
     </View>
   </View>
 );

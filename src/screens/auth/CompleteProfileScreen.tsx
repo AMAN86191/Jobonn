@@ -161,12 +161,12 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           text2: res?.message || 'Company Profile updated successfully!',
         });
 
-
+        navigation.replace('ManagerHome');
         return;
       }
 
       // await UpdateProfile({ profile_completed: true });
-      setIsCompleted(true);
+      navigation.replace('CandidateHome');
     } catch (error: any) {
       console.error('Failed to mark profile complete:', error);
       Toast.show({

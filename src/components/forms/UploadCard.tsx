@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { UploadCloud, FileText, Image as ImageIcon, X, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -33,13 +34,20 @@ const UploadCard: React.FC<UploadCardProps> = ({ label, type, value, onChange, e
   const pdfRef = React.useRef<React.ElementRef<typeof Pdf>>(null);
 
   const handleUpload = async () => {
-
-
     try {
       if (type === 'image') {
         const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
         if (result.assets && result.assets.length > 0) {
           const asset = result.assets[0];
+          const fileSize = asset.fileSize || 0;
+          if (fileSize > 2 * 1024 * 1024) {
+            Toast.show({
+              type: 'error',
+              text1: 'Upload Error',
+              text2: 'Image size must be less than 2MB.',
+            });
+            return;
+          }
           onChange({
             uri: asset.uri || '',
             name: asset.fileName || 'image.jpg',
@@ -156,8 +164,8 @@ const UploadCard: React.FC<UploadCardProps> = ({ label, type, value, onChange, e
 
                   {totalPages > 1 && (
                     <View style={styles.paginationRow}>
-                      <TouchableOpacity 
-                        style={[styles.pageBtn, currentPage === 1 && { opacity: 0.5 }]} 
+                      <TouchableOpacity
+                        style={[styles.pageBtn, currentPage === 1 && { opacity: 0.5 }]}
                         onPress={() => {
                           if (currentPage > 1) {
                             pdfRef.current?.setPage(currentPage - 1);
@@ -167,13 +175,13 @@ const UploadCard: React.FC<UploadCardProps> = ({ label, type, value, onChange, e
                       >
                         <ChevronLeft size={wp('5%')} color={Colors.textSecondary} />
                       </TouchableOpacity>
-                      
+
                       <View style={styles.pageIndicator}>
                         <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
                       </View>
-                      
-                      <TouchableOpacity 
-                        style={[styles.pageBtn, currentPage === totalPages && { opacity: 0.5 }]} 
+
+                      <TouchableOpacity
+                        style={[styles.pageBtn, currentPage === totalPages && { opacity: 0.5 }]}
                         onPress={() => {
                           if (currentPage < totalPages) {
                             pdfRef.current?.setPage(currentPage + 1);
@@ -211,7 +219,7 @@ const UploadCard: React.FC<UploadCardProps> = ({ label, type, value, onChange, e
           <UploadCloud size={wp('8%')} color={Colors.textSecondary} style={styles.uploadIcon} />
           <Text style={styles.uploadText}>{placeholder || `Tap to upload ${type}`}</Text>
           <Text style={styles.uploadSubText}>
-            {type === 'image' ? 'JPG, PNG max 5MB' : 'PDF, DOCX max 10MB'}
+            {type === 'image' ? 'JPG, PNG max 2MB' : 'PDF, DOCX max 10MB'}
           </Text>
         </TouchableOpacity>
       )}

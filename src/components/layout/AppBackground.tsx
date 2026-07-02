@@ -4,7 +4,7 @@ import Svg, { Circle, Rect, Defs, RadialGradient, Stop, Path, G } from 'react-na
 import { Colors } from '../../theme/Colors';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get('screen');
 
 interface AppBackgroundProps {
   children: React.ReactNode;
@@ -15,8 +15,8 @@ const AppBackground: React.FC<AppBackgroundProps> = ({ children, style }) => {
   return (
     <View style={[styles.container, style]}>
       {/* Premium 3D Mesh & Organic Background */}
-      <View style={StyleSheet.absoluteFill}>
-        <Svg height="100%" width="100%" viewBox={`0 0 ${width} ${height}`} style={StyleSheet.absoluteFill}>
+      <View style={[StyleSheet.absoluteFill, { width, height }]}>
+        <Svg height={height} width={width} viewBox={`0 0 ${width} ${height}`} style={StyleSheet.absoluteFill}>
           <Defs>
             {/* Soft Mesh Gradients */}
             <RadialGradient id="meshPurple" cx="20%" cy="20%" rx="60%" ry="60%" fx="20%" fy="20%" gradientUnits="userSpaceOnUse">

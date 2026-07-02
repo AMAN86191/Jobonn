@@ -37,6 +37,7 @@ import RecommendedCandidatesScreen from '../screens/manager/RecommendedCandidate
 
 import ManagerAnalyticsScreen from '../screens/manager/ManagerAnalyticsScreen';
 import PackageManagementScreen from '../screens/manager/PackageManagementScreen';
+import PackageDetailsScreen from '../screens/manager/PackageDetailsScreen';
 import AuditLogScreen from '../screens/manager/AuditLogScreen';
 import UpdateCompanyProfileScreen from '../screens/auth/UpdateCompanyProfileScreen';
 import TermsAndConditionsScreen from '../screens/common/TermsAndConditionsScreen';
@@ -76,6 +77,7 @@ export type RootStackParamList = {
   UpdateCompanyProfileScreen: { role?: 'candidate' | 'company'; company_id?: string | number; isEditMode?: boolean; profileData?: any;[key: string]: any } | undefined;
   ManagerAnalytics: undefined;
   PackageManagement: undefined;
+  PackageDetails: { purchasedPackages: any[]; currentPlan: any } | undefined;
   AuditLogs: undefined;
   TermsAndConditions: undefined;
   UpdateJobScreen: { role?: 'candidate' | 'company'; company_id?: string | number; isEditMode?: boolean; profileData?: any;[key: string]: any } | undefined;
@@ -218,10 +220,6 @@ const Allroute = () => {
           component={ManagerAllJobsScreen}
         />
         <Stack.Screen
-          name="ManagerInterviews"
-          component={ManagerInterviewsScreen}
-        />
-        <Stack.Screen
           name="RecommendedCandidates"
           component={RecommendedCandidatesScreen}
         />
@@ -236,6 +234,10 @@ const Allroute = () => {
         <Stack.Screen
           name="PackageManagement"
           component={PackageManagementScreen}
+        />
+        <Stack.Screen
+          name="PackageDetails"
+          component={PackageDetailsScreen}
         />
         <Stack.Screen
           name="AuditLogs"

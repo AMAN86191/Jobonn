@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, StatusBar, TextInput, Pressable, ActivityIndicator, RefreshControl, TouchableOpacity
 } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { Search, SlidersHorizontal, ArrowLeft, ArrowRight } from 'lucide-react-native';
+import { Search, SlidersHorizontal, ArrowLeft, ArrowRight, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/Colors';
 import { RFValue } from 'react-native-responsive-fontsize';
@@ -12,19 +12,29 @@ import CandidateCard, { getAvatarColor } from '../../components/Manager_componen
 import FilterModal, { FilterSection } from '../../components/Manager_component/FilterModal';
 import { StatusType } from '../../components/Manager_component/StatusBadge';
 import { useDispatch, useSelector } from 'react-redux';
-import { getAppliedCandidatesSlice } from '../../redux/CompanyHomeSlice';
+import { getAppliedCandidatesSlice, getAllInvitationsSlice } from '../../redux/CompanyHomeSlice';
+import {
+  getAllSkills,
+  getAllLocations,
+  getJobDepartmentsMaster,
+  getJobTitlesMaster
+} from '../../api/CandidateJobProvider';
 
-const TABS = ['Applied', 'Shortlisted', 'Interview Scheduled', 'Hired', 'Rejected'];
+const TABS = ['Applied', 'Invited', 'Shortlisted','Hired', 'Rejected'];
 
 const mapApiStatusToTab = (apiStatus: string) => {
   switch (apiStatus?.toLowerCase()) {
     case 'applied': return 'Applied';
     case 'shortlisted': return 'Shortlisted';
-    case 'interview_schedule':
-    case 'interview':
-      return 'Interview Scheduled';
+    // case 'interview_schedule':
+    // case 'interview':
+    //   return 'Interview Scheduled';
     case 'hired': return 'Hired';
     case 'rejected': return 'Rejected';
+    case 'sent':
+    case 'invited':
+    case 'accepted':
+      return 'Invited';
     default: return 'Applied';
   }
 };
@@ -32,8 +42,9 @@ const mapApiStatusToTab = (apiStatus: string) => {
 const mapTabToBadgeStatus = (tabName: string): StatusType => {
   switch (tabName) {
     case 'Applied': return 'New';
+    case 'Invited': return 'Invited';
     case 'Shortlisted': return 'Shortlisted';
-    case 'Interview Scheduled': return 'Interview';
+    // case 'Interview Scheduled': return 'Interview';
     case 'Hired': return 'Hired';
     case 'Rejected': return 'Rejected';
     default: return 'New';
@@ -65,103 +76,192 @@ const formatTimeAgo = (dateStr: string) => {
   }
 };
 
-const FILTER_SECTIONS: FilterSection[] = [
-  {
-    title: 'Department',
-    type: 'searchable-multi',
-    options: [
-      { key: 'Engineering', label: 'Engineering' },
-      { key: 'Design', label: 'Design' },
-      { key: 'Product', label: 'Product' },
-      { key: 'Marketing', label: 'Marketing' },
-      { key: 'Sales', label: 'Sales' },
-    ],
-  },
-  {
-    title: 'Skills',
-    type: 'searchable-multi',
-    options: [
-      { key: 'React Native', label: 'React Native' },
-      { key: 'TypeScript', label: 'TypeScript' },
-      { key: 'Node.js', label: 'Node.js' },
-      { key: 'Figma', label: 'Figma' },
-      { key: 'AWS', label: 'AWS' },
-      { key: 'Python', label: 'Python' },
-      { key: 'Redux', label: 'Redux' },
-      { key: 'Kubernetes', label: 'Kubernetes' },
-    ],
-  },
-  { title: 'Experience', type: 'range', options: [] },
-  { title: 'Salary Range', type: 'range', options: [] },
-  {
-    title: 'Job Type',
-    options: [
-      { key: 'Full-Time', label: 'Full-Time' },
-      { key: 'Part-Time', label: 'Part-Time' },
-      { key: 'Contract', label: 'Contract' },
-      { key: 'Internship', label: 'Internship' },
-    ],
-  },
-  {
-    title: 'Work Mode',
-    options: [
-      { key: 'Remote', label: 'Remote' },
-      { key: 'Hybrid', label: 'Hybrid' },
-      { key: 'On-site', label: 'On-site' },
-    ],
-  },
-  {
-    title: 'Location',
-    type: 'searchable-multi',
-    options: [
-      { key: 'Bangalore', label: 'Bangalore' },
-      { key: 'Mumbai', label: 'Mumbai' },
-      { key: 'Hyderabad', label: 'Hyderabad' },
-      { key: 'Delhi NCR', label: 'Delhi NCR' },
-      { key: 'Pune', label: 'Pune' },
-      { key: 'Remote', label: 'Remote' },
-    ],
-  },
-  {
-    title: 'Education',
-    options: [
-      { key: 'B.Tech', label: 'B.Tech' },
-      { key: 'M.Tech', label: 'M.Tech' },
-      { key: 'MCA', label: 'MCA' },
-      { key: 'MBA', label: 'MBA' },
-      { key: 'BSc', label: 'BSc' },
-    ],
-  },
-  {
-    title: 'Notice Period',
-    type: 'minmax',
-    options: [],
-  },
-];
-
 const ManagerApplicantsScreen = ({ navigation }: any) => {
   const dispatch = useDispatch<any>();
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('Applied');
   const [search, setSearch] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
+
+  // Dynamic filter options state
+  const [skillsOptions, setSkillsOptions] = useState<any[]>([]);
+  const [locationOptions, setLocationOptions] = useState<any[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<any[]>([]);
+  const [jobTitleOptions, setJobTitleOptions] = useState<any[]>([]);
+
+  const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
+    'Job Title': [],
+    'Department': [],
+    'Skills': [],
+    'Location': [],
+    'Work Mode': [],
+    'Job Type': [],
+    'Experience': [],
+    'Salary Range': [],
+  });
+  const [tempFilters, setTempFilters] = useState<Record<string, string[]>>({
+    'Job Title': [],
+    'Department': [],
+    'Skills': [],
+    'Location': [],
+    'Work Mode': [],
+    'Job Type': [],
+    'Experience': [],
+    'Salary Range': [],
+  });
+
+  // Fetch dynamic master lists from the APIs
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const [skillsRes, locationsRes, deptsRes, titlesRes] = await Promise.all([
+          getAllSkills(),
+          getAllLocations(),
+          getJobDepartmentsMaster(),
+          getJobTitlesMaster(),
+        ]);
+
+        console.log('all-skills response:', skillsRes);
+        console.log('all-locations response:', locationsRes);
+        console.log('job-departments response:', deptsRes);
+        console.log('job-titles response:', titlesRes);
+
+        const skillsList = skillsRes?.skills || skillsRes?.data || skillsRes || [];
+        setSkillsOptions(
+          skillsList.map((item: any) => ({
+            key: String(item.id),
+            label: item.skill_name || item.name || item.title || '',
+          })).filter((item: any) => item.label)
+        );
+
+        const locsList = locationsRes?.locations || locationsRes?.location || locationsRes?.data || locationsRes || [];
+        setLocationOptions(
+          locsList.map((item: any) => ({
+            key: String(item.id || item.location_name || item),
+            label: item.location_name || item.name || String(item),
+          })).filter((item: any) => item.label)
+        );
+
+        const deptsList = deptsRes?.departments || deptsRes?.job_departments || deptsRes?.data || deptsRes || [];
+        setDepartmentOptions(
+          deptsList.map((item: any) => ({
+            key: String(item.id),
+            label: item.department_name || item.name || '',
+          })).filter((item: any) => item.label)
+        );
+
+        const titlesList = titlesRes?.titles || titlesRes?.job_titles || titlesRes?.data || titlesRes || [];
+        setJobTitleOptions(
+          titlesList.map((item: any) => ({
+            key: String(item.id),
+            label: item.job_name || item.name || item.title || '',
+          })).filter((item: any) => item.label)
+        );
+      } catch (err) {
+        console.log('Error loading dynamic filter options:', err);
+      }
+    };
+    loadFilters();
+  }, []);
+
+  const filterSections = useMemo<FilterSection[]>(() => {
+    return [
+      {
+        title: 'Job Title',
+        type: 'searchable-multi',
+        options: jobTitleOptions,
+      },
+      // {
+      //   title: 'Department',
+      //   type: 'searchable-multi',
+      //   options: departmentOptions,
+      // },
+      {
+        title: 'Skills',
+        type: 'searchable-multi',
+        options: skillsOptions,
+      },
+      {
+        title: 'Location',
+        type: 'searchable-multi',
+        options: locationOptions,
+      },
+      {
+        title: 'Job Type',
+        options: [
+          { key: 'Full-Time', label: 'Full-Time' },
+          { key: 'Part-Time', label: 'Part-Time' },
+          { key: 'Contract', label: 'Contract' },
+          { key: 'Internship', label: 'Internship' },
+        ],
+      },
+      { title: 'Experience', type: 'range', options: [] },
+      { title: 'Salary Range', type: 'range', options: [] },
+    ];
+  }, [skillsOptions, locationOptions, departmentOptions, jobTitleOptions]);
 
   const [appliedCandidates, setAppliedCandidates] = useState<any[]>([]);
+  const [invitations, setInvitations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastPage, setLastPage] = useState(1);
   const [totalCandidates, setTotalCandidates] = useState(0);
 
+  const handleSearchSubmit = () => {
+    setPage(1);
+    setActiveSearch(search);
+  };
+
+  // Construct API payload for filtering
+  const apiFilters = useMemo(() => {
+    const filters: any = {};
+    if (selectedFilters['Job Title']?.length > 0) {
+      filters.job_title_id = selectedFilters['Job Title'][0];
+    }
+    const selectedJobTypes = selectedFilters['Job Type'] || [];
+    if (selectedJobTypes.length > 0) {
+      filters.job_type = selectedJobTypes[0].toLowerCase().replace(' ', '_');
+    }
+    if (selectedFilters['Skills']?.length > 0) {
+      filters.skills = selectedFilters['Skills'];
+    }
+    if (selectedFilters['Location']?.length > 0) {
+      const selectedKeys = selectedFilters['Location'];
+      const locationLabels = selectedKeys.map(key => {
+        const option = locationOptions.find(o => o.key === key);
+        return option ? option.label : key;
+      });
+      filters.location = locationLabels[0];
+    }
+    if (selectedFilters['Experience']?.length === 2) {
+      filters.min_experience = selectedFilters['Experience'][0];
+      filters.max_experience = selectedFilters['Experience'][1];
+    }
+    if (selectedFilters['Salary Range']?.length === 2) {
+      filters.min_salary = selectedFilters['Salary Range'][0];
+      filters.max_salary = selectedFilters['Salary Range'][1];
+    }
+    if (activeSearch.trim().length > 0) {
+      filters.search = activeSearch.trim();
+    }
+    return filters;
+  }, [selectedFilters, activeSearch, locationOptions]);
+
   const fetchApplicants = async (pageNum: number, isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const response = await dispatch(getAppliedCandidatesSlice(pageNum)).unwrap();
+      const response = await dispatch(getAppliedCandidatesSlice({ page: pageNum, filters: apiFilters }) as any).unwrap();
       console.log('getAppliedCandidates response:', response);
       const list = response?.applications?.data || [];
       setAppliedCandidates(list);
       setLastPage(response?.applications?.last_page || 1);
       setTotalCandidates(response?.applications?.total || 0);
+
+      const invitationsRes = await dispatch(getAllInvitationsSlice() as any).unwrap();
+      console.log('getAllInvitations response:', invitationsRes);
+      const rawInvites = invitationsRes?.invitations?.data || invitationsRes?.data || [];
+      setInvitations(rawInvites);
     } catch (error) {
       console.log('Error fetching applied candidates:', error);
     } finally {
@@ -171,15 +271,15 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchApplicants(page);
-  }, [page]);
+  }, [page, apiFilters]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchApplicants(1);
       setPage(1);
+      fetchApplicants(1);
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, apiFilters]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -188,7 +288,10 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
   };
 
   const normalizedApplicants = useMemo(() => {
-    return (appliedCandidates || []).map((item: any) => {
+    const list: any[] = [];
+
+    // Map direct applications
+    (appliedCandidates || []).forEach((item: any) => {
       const cand = item.candidate || {};
       const job = item.applied_job || {};
 
@@ -196,19 +299,36 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
       const expectedCTC = cand.expected_salary ? `${cand.expected_salary} LPA` : undefined;
       const mappedStatus = mapApiStatusToTab(item.status);
 
-      return {
-        id: String(item.id),
+      // Skills normalization
+      const rawSkills = cand.skills || cand.professional_detail?.skills || [];
+      const candidateSkills = Array.isArray(rawSkills)
+        ? rawSkills.map((s: any) => {
+            if (typeof s === 'string') return s;
+            if (s && typeof s === 'object') return s.skill_name || s.name || s.skill || '';
+            return '';
+          }).filter(Boolean)
+        : (typeof rawSkills === 'string' ? rawSkills.split(',').map((s: string) => s.trim()) : []);
+
+      // Work Mode normalization
+      const workModeStr = job.work_mode || job.workMode || (job.job_type === 'remote' || job.job_type?.toLowerCase() === 'remote' ? 'Remote' : (job.job_type === 'hybrid' || job.job_type?.toLowerCase() === 'hybrid' ? 'Hybrid' : 'On-site'));
+
+      // Department normalization
+      const deptStr = job.department?.department_name || (typeof job.department === 'string' ? job.department : '') || '';
+
+      list.push({
+        id: `app-${item.id}`,
+        applicationId: item.id,
         user_id: item.user_id,
         candidate_id: cand.id,
         name: cand.name || '',
-        role: cand.job_title || '',
-        experience: cand.experience || 'Fresher',
-        location: cand.location || '',
+        role: cand.job_title || cand.professional_detail?.job_title || '',
+        experience: cand.experience || cand.professional_detail?.experience || 'Fresher',
+        location: cand.location || cand.professional_detail?.current_location || '',
         status: mapTabToBadgeStatus(mappedStatus),
         atsStage: mappedStatus,
         currentCTC: currentCTC,
         expectedCTC: expectedCTC,
-        time: formatTimeAgo(item.applied_at),
+        time: formatTimeAgo(item.applied_at || item.created_at),
         image: cand.profile_img ? { uri: cand.profile_img } : undefined,
         emailAddress: cand.email || '',
         phoneNumber: cand.phone || '',
@@ -218,88 +338,200 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
         jobType: job.job_type || '',
         appliedJob: job.job_title || '',
         rawApplication: item,
-      };
+        isInvitation: false,
+        skills: candidateSkills,
+        workMode: workModeStr,
+        department: deptStr,
+      });
     });
-  }, [appliedCandidates]);
+
+    // Map invitations
+    (invitations || []).forEach((invite: any) => {
+      const cand = invite.candidate || {};
+      const job = invite.job || {};
+
+      const name = cand.name || cand.user?.name || '';
+      const email = cand.email || cand.user?.email || '';
+
+      const role = cand.professional_detail?.job_title || cand.job_title || cand.role || '';
+      const experience = cand.professional_detail?.experience || cand.experience || 'Fresher';
+
+      let location = cand.location || '';
+      if (!location && cand.personal_detail) {
+        const city = cand.personal_detail.city || '';
+        const state = cand.personal_detail.state || '';
+        if (city && state) {
+          location = `${city}, ${state}`;
+        } else {
+          location = city || state || '';
+        }
+      }
+
+      const rawCurrentCTC = cand.professional_detail?.current_ctc || cand.current_ctc;
+      const currentCTC = rawCurrentCTC ? `${rawCurrentCTC} LPA` : undefined;
+
+      const rawExpectedCTC = cand.professional_detail?.expected_salary || cand.expected_salary;
+      const expectedCTC = rawExpectedCTC ? `${rawExpectedCTC} LPA` : undefined;
+
+      const profileImg = cand.profile_img || cand.docs?.profile_img || cand.image;
+      const noticePeriod = cand.professional_detail?.notice_period || cand.notice_period || 'Immediate';
+
+      const mappedStatus = mapApiStatusToTab(invite.status);
+
+      // Skills normalization
+      const rawSkills = cand.skills || cand.professional_detail?.skills || [];
+      const candidateSkills = Array.isArray(rawSkills)
+        ? rawSkills.map((s: any) => {
+            if (typeof s === 'string') return s;
+            if (s && typeof s === 'object') return s.skill_name || s.name || s.skill || '';
+            return '';
+          }).filter(Boolean)
+        : (typeof rawSkills === 'string' ? rawSkills.split(',').map((s: string) => s.trim()) : []);
+
+      // Work Mode normalization
+      const workModeStr = job.work_mode || job.workMode || (job.job_type === 'remote' || job.job_type?.toLowerCase() === 'remote' ? 'Remote' : (job.job_type === 'hybrid' || job.job_type?.toLowerCase() === 'hybrid' ? 'Hybrid' : 'On-site'));
+
+      // Department normalization
+      const deptStr = job.department?.department_name || (typeof job.department === 'string' ? job.department : '') || '';
+
+      list.push({
+        id: `invite-${invite.id}`,
+        invitationId: invite.id,
+        user_id: cand.user_id,
+        candidate_id: cand.id,
+        name,
+        role,
+        experience,
+        location,
+        status: mapTabToBadgeStatus(mappedStatus),
+        atsStage: mappedStatus,
+        currentCTC,
+        expectedCTC,
+        time: formatTimeAgo(invite.created_at || invite.updated_at),
+        image: profileImg ? { uri: profileImg.startsWith('http') ? profileImg : `https://admin.jobonn.in/storage/${profileImg}` } : undefined,
+        emailAddress: email,
+        phoneNumber: cand.phone || '',
+        whatsappNumber: cand.phone || '',
+        noticePeriod,
+        preferredLocation: location,
+        jobType: job.job_type || '',
+        appliedJob: job.job_title?.job_name || job.job_title || job.title || '',
+        rawApplication: invite,
+        isInvitation: true,
+        skills: candidateSkills,
+        workMode: workModeStr,
+        department: deptStr,
+      });
+    });
+
+    return list;
+  }, [appliedCandidates, invitations]);
 
   const filtered = normalizedApplicants.filter((a: any) => {
     const matchTab = a.atsStage === activeTab || a.status === activeTab;
-    const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.role.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !activeSearch.trim().length ||
+      a.name.toLowerCase().includes(activeSearch.toLowerCase()) ||
+      a.role.toLowerCase().includes(activeSearch.toLowerCase());
+
+    // Job Title Filter
+    const selectedJobTitles = selectedFilters['Job Title']?.map(key => jobTitleOptions.find(o => o.key === key)?.label).filter(Boolean) || [];
+    const matchJobTitle = !selectedJobTitles.length || selectedJobTitles.some(title => a.role?.toLowerCase().includes(title.toLowerCase()));
 
     // Department Filter
-    const matchDept = !selected.Department?.length || selected.Department.includes(a.department);
+    const selectedDepts = selectedFilters.Department?.map(key => departmentOptions.find(o => o.key === key)?.label).filter(Boolean) || [];
+    const matchDept = !selectedDepts.length || selectedDepts.some(dept => a.department?.toLowerCase().includes(dept.toLowerCase()));
 
     // Skills Filter
-    const matchSkills = !selected.Skills?.length || selected.Skills.some(skill => a.skills?.includes(skill));
+    const selectedSkillNames = selectedFilters.Skills?.map(key => skillsOptions.find(o => o.key === key)?.label).filter(Boolean) || [];
+    const matchSkills = !selectedSkillNames.length || selectedSkillNames.some(skillName => a.skills?.some((s: string) => s.toLowerCase().includes(skillName.toLowerCase())));
 
     // Experience Range Filter
     let matchExp = true;
-    if (selected.Experience?.length === 2) {
-      const minExp = parseInt(selected.Experience[0]);
-      const maxExp = parseInt(selected.Experience[1]);
+    if (selectedFilters.Experience?.length === 2) {
+      const minExp = parseInt(selectedFilters.Experience[0]);
+      const maxExp = parseInt(selectedFilters.Experience[1]);
       const expVal = parseInt(a.experience) || 0;
       matchExp = expVal >= minExp && expVal <= maxExp;
     }
 
     // Salary Range Filter
     let matchSalary = true;
-    if (selected['Salary Range']?.length === 2) {
-      const minSal = parseInt(selected['Salary Range'][0]);
-      const maxSal = parseInt(selected['Salary Range'][1]);
+    if (selectedFilters['Salary Range']?.length === 2) {
+      const minSal = parseInt(selectedFilters['Salary Range'][0]);
+      const maxSal = parseInt(selectedFilters['Salary Range'][1]);
       const salVal = parseInt(a.currentCTC) || 0;
       matchSalary = salVal >= minSal && salVal <= maxSal;
     }
 
     // Job Type Filter
-    const matchJobType = !selected['Job Type']?.length || selected['Job Type'].includes(a.jobType);
+    const matchJobType = !selectedFilters['Job Type']?.length || selectedFilters['Job Type'].some((type: string) => a.jobType?.toLowerCase().replace('-', ' ').includes(type.toLowerCase().replace('-', ' ')));
 
     // Work Mode Filter
-    const matchWorkMode = !selected['Work Mode']?.length || selected['Work Mode'].includes(a.workMode);
+    // const matchWorkMode = !selectedFilters['Work Mode']?.length || selectedFilters['Work Mode'].some((mode: string) => a.workMode?.toLowerCase().includes(mode.toLowerCase()));
 
     // Location Filter
-    const matchLocation = !selected.Location?.length || selected.Location.includes(a.location);
+    const selectedLocs = selectedFilters.Location?.map(key => locationOptions.find(o => o.key === key)?.label).filter(Boolean) || [];
+    const matchLocation = !selectedLocs.length || selectedLocs.some(loc => a.location?.toLowerCase().includes(loc.toLowerCase()));
 
-    // Education Filter
-    const matchEducation = !selected.Education?.length || selected.Education.includes(a.education);
-
-    // Notice Period Filter
-    let matchNotice = true;
-    if (selected['Notice Period']?.length === 2) {
-      const minN = selected['Notice Period'][0] === '' ? 0 : parseInt(selected['Notice Period'][0]);
-      const maxN = selected['Notice Period'][1] === '' ? 999 : parseInt(selected['Notice Period'][1]);
-      const applicantNotice = a.noticePeriod === 'Immediate' ? 0 : parseInt(a.noticePeriod) || 0;
-      matchNotice = applicantNotice >= minN && applicantNotice <= maxN;
-    }
-
-    // Company Type Filter
-    const matchCompany = !selected['Company Type']?.length || selected['Company Type'].includes(a.companyType);
-
-    // Benefits Filter
-    const matchBenefits = !selected.Benefits?.length || selected.Benefits.some(benefit => a.benefits?.includes(benefit));
-
-    // Posted Date Filter
-    const matchPosted = !selected['Posted Date']?.length || selected['Posted Date'].includes(a.postedDate);
-
-    // Interview Type Filter
-    const matchInterview = !selected['Interview Type']?.length || selected['Interview Type'].includes(a.interviewType);
-
-    return matchTab && matchSearch && matchDept && matchSkills && matchExp && matchSalary && matchJobType && matchWorkMode && matchLocation && matchEducation && matchNotice && matchCompany && matchBenefits && matchPosted && matchInterview;
+    return matchTab && matchSearch;
   });
 
-  const handleFilterSelect = (section: string, key: string) => {
-    setSelected(prev => {
+  const handleOpenFilter = () => {
+    setTempFilters(selectedFilters);
+    setFilterVisible(true);
+  };
+
+  const handleSelectFilter = (section: string, key: string) => {
+    setTempFilters(prev => {
       const current = prev[section] || [];
       if (key.startsWith('range:')) {
         const [min, max] = key.replace('range:', '').split('-');
         return { ...prev, [section]: [min, max] };
       }
-      if (key.startsWith('min:')) return { ...prev, [section]: [key.replace('min:', ''), current[1] || ''] };
-      if (key.startsWith('max:')) return { ...prev, [section]: [current[0] || '', key.replace('max:', '')] };
-      const updated = current.includes(key) ? current.filter(k => k !== key) : [...current, key];
+      const updated = current.includes(key)
+        ? current.filter(k => k !== key)
+        : [...current, key];
       return { ...prev, [section]: updated };
     });
   };
+
+  const handleApplyFilter = () => {
+    setPage(1);
+    setSelectedFilters(tempFilters);
+    setFilterVisible(false);
+  };
+
+  const handleResetFilter = () => {
+    const resetVal = {
+      'Job Title': [],
+      'Department': [],
+      'Skills': [],
+      'Location': [],
+      'Work Mode': [],
+      'Job Type': [],
+      'Experience': [],
+      'Salary Range': [],
+    };
+    setPage(1);
+    setTempFilters(resetVal);
+    setSelectedFilters(resetVal);
+    setFilterVisible(false);
+  };
+
+  const handleRemoveFilter = (section: string, key: string) => {
+    setPage(1);
+    setSelectedFilters(prev => {
+      const current = prev[section] || [];
+      let updated: string[] = [];
+      if (key === 'range') {
+        updated = [];
+      } else {
+        updated = current.filter(k => k !== key);
+      }
+      return { ...prev, [section]: updated };
+    });
+  };
+
   console.log('filtered', filtered)
   return (
     <SafeAreaView style={styles.safe}>
@@ -312,19 +544,74 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Search color={Colors.textTertiary} size={RFValue(11)} strokeWidth={2} />
+          <TouchableOpacity onPress={handleSearchSubmit} activeOpacity={0.7} style={{ marginRight: wp('1.5%') }}>
+            <Search color={Colors.textTertiary} size={RFValue(11)} strokeWidth={2} />
+          </TouchableOpacity>
           <TextInput
             style={styles.searchInput}
             placeholder="Search name or role..."
             placeholderTextColor={Colors.textTertiary}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={(text) => {
+              setSearch(text);
+              if (!text.trim()) {
+                setPage(1);
+                setActiveSearch('');
+              }
+            }}
+            onSubmitEditing={handleSearchSubmit}
+            returnKeyType="search"
           />
         </View>
-        <Pressable style={styles.filterBtn} onPress={() => setFilterVisible(true)}>
+        <Pressable style={styles.filterBtn} onPress={handleOpenFilter}>
           <SlidersHorizontal color={Colors.white} size={RFValue(11)} strokeWidth={2} />
         </Pressable>
       </View>
+
+      {/* Active Filter Chips */}
+      {(() => {
+        const activeList: { section: string; key: string; label: string }[] = [];
+        Object.keys(selectedFilters).forEach(section => {
+          const vals = selectedFilters[section] || [];
+          if (section === 'Experience' || section === 'Salary Range') {
+            if (vals.length === 2) {
+              const label = section === 'Experience'
+                ? `${vals[0]}-${vals[1]} Yrs`
+                : `${vals[0]}-${vals[1]} LPA`;
+              activeList.push({ section, key: 'range', label });
+            }
+          } else {
+            vals.forEach(key => {
+              const sec = filterSections.find(s => s.title === section);
+              const opt = sec?.options?.find(o => o.key === key);
+              const label = opt ? opt.label : key;
+              activeList.push({ section, key, label });
+            });
+          }
+        });
+
+        if (activeList.length === 0) return null;
+
+        return (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.activeChipsScroll}
+            contentContainerStyle={styles.activeChipsContent}
+          >
+            {activeList.map((item, idx) => (
+              <TouchableOpacity
+                key={`${item.section}-${item.key}-${idx}`}
+                style={styles.activeChip}
+                onPress={() => handleRemoveFilter(item.section, item.key)}
+              >
+                <Text style={styles.activeChipText}>{item.label}</Text>
+                <X color={Colors.primary} size={RFValue(8.5)} style={{ marginLeft: wp('1%') }} />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        );
+      })()}
 
       <ScrollView
         horizontal
@@ -410,11 +697,11 @@ const ManagerApplicantsScreen = ({ navigation }: any) => {
       <FilterModal
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
-        sections={FILTER_SECTIONS}
-        selected={selected}
-        onSelect={handleFilterSelect}
-        onApply={() => setFilterVisible(false)}
-        onReset={() => setSelected({})}
+        sections={filterSections}
+        selected={tempFilters}
+        onSelect={handleSelectFilter}
+        onApply={handleApplyFilter}
+        onReset={handleResetFilter}
       />
     </SafeAreaView>
   );
@@ -537,6 +824,31 @@ const styles = StyleSheet.create({
     fontSize: RFValue(9.5),
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  activeChipsScroll: {
+    marginVertical: hp('0.5%'),
+    flexGrow: 0,
+  },
+  activeChipsContent: {
+    gap: wp('1.5%'),
+    paddingHorizontal: wp('2%'),
+    alignItems: 'center',
+    paddingBottom: hp('0.5%'),
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: wp('3%'),
+    paddingVertical: hp('0.6%'),
+    borderRadius: wp('4%'),
+    backgroundColor: Colors.primary + '08',
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  activeChipText: {
+    fontSize: RFValue(8.5),
+    color: Colors.primary,
+    fontWeight: '600',
   },
 });
 

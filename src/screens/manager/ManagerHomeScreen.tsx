@@ -7,7 +7,7 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, Briefcase, Calendar, AlertCircle, ArrowLeft, ArrowRight, CreditCard, FileClock, BarChart3 } from 'lucide-react-native';
+import { Users, Briefcase, Calendar, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../theme/Colors';
 import ManagerHeader from '../../components/Manager_component/ManagerHeader';
@@ -15,17 +15,42 @@ import PostJobBanner from '../../components/Manager_component/PostJobBanner';
 import ActiveJobCard from '../../components/Manager_component/ActiveJobCard';
 import AdSlider from '../../components/Manager_component/AdSlider';
 import { RFValue } from 'react-native-responsive-fontsize';
-import { recruiterProfile, jobs } from '../../data/jobonnStaticData';
 import ProfileCompletenessBanner from '../../components/Manager_component/ProfileCompletenessBanner';
 import { getProfileCompleteness } from '../../utils/profileCompleteness';
-
 import { useDispatch, useSelector } from 'react-redux';
-import { getCompanyJobsSlice, getCompanyProfileSlice } from '../../redux/CompanyHomeSlice';
+import { getCompanyJobsSlice, getCompanyProfileSlice, getRecommendedCandidatesSlice } from '../../redux/CompanyHomeSlice';
 import { normalizeBackendJob } from '../../utils/jobNormalizer';
+import CandidateCard, { getAvatarColor } from '../../components/Manager_component/CandidateCard';
 import Toast from 'react-native-toast-message';
 import StatCard from '../../components/Manager_component/StatCard';
 
 
+
+const normalizeRecommendedCandidate = (cand: any) => {
+  if (!cand) return null;
+  const currentCTC = cand.current_ctc ? `${cand.current_ctc} LPA` : undefined;
+  const expectedCTC = cand.expected_salary ? `${cand.expected_salary} LPA` : undefined;
+  const profileImg = cand.profile_img || cand.docs?.profile_img || cand.image;
+  return {
+    id: String(cand.id),
+    user_id: cand.user_id,
+    candidate_id: cand.id,
+    name: cand.name || '',
+    role: cand.job_title || cand.role || '',
+    experience: cand.experience || 'Fresher',
+    location: cand.location || '',
+    status: undefined,
+    currentCTC: currentCTC,
+    expectedCTC: expectedCTC,
+    image: profileImg ? { uri: profileImg.startsWith('http') ? profileImg : `https://admin.jobonn.in/storage/${profileImg}` } : undefined,
+    emailAddress: cand.email || '',
+    phoneNumber: cand.phone || '',
+    whatsappNumber: cand.phone || '',
+    noticePeriod: cand.notice_period || 'Immediate',
+    preferredLocation: cand.location || '',
+    rawCandidate: cand,
+  };
+};
 
 const getLatestActivePackage = (profile: any) => {
   if (!profile?.company_packages || !Array.isArray(profile.company_packages)) return null;
@@ -39,6 +64,28 @@ const ManagerHomeScreen = ({ navigation }: any) => {
   const [user, setUser] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [companyProfile, setCompanyProfile] = useState<any>(null);
+
+  const [recommendedCandidates, setRecommendedCandidates] = useState<any[]>([]);
+  const [loadingRecommended, setLoadingRecommended] = useState(false);
+
+  const fetchRecommended = async () => {
+    try {
+      setLoadingRecommended(true);
+      const res = await dispatch(getRecommendedCandidatesSlice() as any).unwrap();
+      console.log('Home getRecommendedCandidates response:', res);
+      const rawList = res?.data || res?.candidates || (Array.isArray(res) ? res : []);
+      const normalized = rawList.map((c: any) => normalizeRecommendedCandidate(c)).filter(Boolean);
+      setRecommendedCandidates(normalized.slice(0, 5));
+    } catch (e) {
+      console.log('Error fetching recommended candidates on home:', e);
+    } finally {
+      setLoadingRecommended(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecommended();
+  }, []);
 
   const { jobs: rawJobs, loading, lastPage } = useSelector((state: any) => state.companyHome);
   const STATS = useMemo(() => {
@@ -190,7 +237,7 @@ const ManagerHomeScreen = ({ navigation }: any) => {
             ))}
           </ScrollView>
         </View> */}
-{/* 
+        {/* 
         <View style={styles.controlGrid}>
           <TouchableOpacity style={styles.controlCard} onPress={() => navigation.navigate('PackageManagement')}>
             <CreditCard size={RFValue(13)} color={Colors.primary} />
@@ -249,13 +296,13 @@ const ManagerHomeScreen = ({ navigation }: any) => {
               key={item.id}
               {...item}
               onPress={() => {
-                if (item.id === '1') navigation.navigate('ManagerAllJobs');
+                if (item.id === '1') navigation.navigate('ManagerJobsTab');
                 else if (item.id === '2') navigation.navigate('ManagerApplicantsTab');
-                else if (item.id === '3') navigation.navigate('ManagerInterviews');
+                else if (item.id === '3') navigation.navigate('ManagerInterviewsTab');
               }}
             />
           ))}
-        </View> 
+        </View>
 
         {/* Active Jobs */}
         <View style={styles.sectionHeader}>
@@ -338,20 +385,26 @@ const ManagerHomeScreen = ({ navigation }: any) => {
         ))} */}
 
         {/* Recommended Candidates */}
-        {/* <View style={[styles.sectionHeader, { marginTop: hp('2%') }]}>
+        <View style={[styles.sectionHeader, { marginTop: hp('2%') }]}>
           <Text style={styles.sectionTitle}>Recommended Candidates</Text>
           <TouchableOpacity onPress={() => navigation.navigate('RecommendedCandidates')}>
             <Text style={styles.seeAll}>See All →</Text>
           </TouchableOpacity>
         </View>
-        {RECOMMENDED_CANDIDATES.map(candidate => (
-          <CandidateCard
-            key={candidate.id}
-            {...candidate}
-            avatarColor={getAvatarColor(candidate.name)}
-            onPress={() => navigation.navigate('CandidateApplicationFullView', { applicant: candidate, isRecommended: true })}
-          />
-        ))} */}
+        {loadingRecommended ? (
+          <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('2%') }} />
+        ) : recommendedCandidates.length > 0 ? (
+          recommendedCandidates.map(candidate => (
+            <CandidateCard
+              key={candidate.id}
+              {...candidate}
+              avatarColor={getAvatarColor(candidate.name)}
+              onPress={() => navigation.navigate('CandidateApplicationFullView', { applicant: candidate, isRecommended: true })}
+            />
+          ))
+        ) : (
+          <Text style={{ textAlign: 'center', color: Colors.textTertiary, marginVertical: hp('2%'), fontSize: RFValue(10) }}>No recommended candidates found</Text>
+        )}
         {/* Promo Banner */}
         <View style={styles.promoBanner} >
           <View style={styles.promoContent}>

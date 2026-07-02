@@ -54,7 +54,7 @@ const CandidateCard: React.FC<CandidateCardProps> = ({
         </View>
         <View style={styles.headerRight}>
           {status && <StatusBadge status={status} />}
-          <Text style={styles.time}>{time}</Text>
+          {/* <Text style={styles.time}>{time}</Text> */}
         </View>
       </View>
 

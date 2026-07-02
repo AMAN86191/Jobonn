@@ -43,6 +43,15 @@ const DEPARTMENTS = [
   { id: 4, name: 'Sales', icon: Users, count: '8k+ Jobs', color: Colors.success },
 ];
 
+const 
+
+getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
 const CandidateHomeScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
   const [activeCategory, setActiveCategory] = useState(1);
@@ -104,7 +113,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
   const completionPercent = completeness.percentage;
   const dashboardStats = [
     { label: 'Profile', value: `${completionPercent}%`, icon: TrendingUp, color: Colors.primary },
-    { label: 'Applied', value: `${user?.candidate.applied_jobs_count || 0}`, icon: FileText, color: Colors.info },
+    { label: 'Applied', value: `${user?.candidate?.applied_jobs_count || 0}`, icon: FileText, color: Colors.info },
     { label: 'Views', value: `${candidateProfile.profileViews}`, icon: Users, color: Colors.success },
     { label: 'Invites', value: `${recentInvites.length}`, icon: Bell, color: Colors.warning },
   ];
@@ -136,7 +145,7 @@ const CandidateHomeScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.greetingContent}>
-              <Text style={styles.greetingText}>Good morning</Text>
+              <Text style={styles.greetingText}>{getGreeting()}</Text>
               <Text style={styles.userName}>Hi, {firstName}</Text>
               <Text style={styles.subText}>Find the perfect job{'\n'}that matches your skills.</Text>
             </View>

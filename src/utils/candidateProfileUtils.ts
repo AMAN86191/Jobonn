@@ -138,6 +138,10 @@ export const buildProfilePayload = (activeSection: string, editData: any, cand: 
   if (activeSection === 'profile') {
     payload = {
       ...payload,
+      name: editData.name,
+      email: editData.email,
+      phone: editData.phone,
+      mobile: editData.phone,
       job_title: editData.job_title,
       current_location: editData.current_location,
     };

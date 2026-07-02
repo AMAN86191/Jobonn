@@ -1,7 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { 
   SendOtp, VerifyOtp, SetPassword, CompleteRegistration, LoginUser, LogoutUser, UpdateCompanyProfile,
-  SendOtpCandidate, VerifyOtpCandidate, SetPasswordCandidate, CompleteRegistrationCandidate
+  SendOtpCandidate, VerifyOtpCandidate, SetPasswordCandidate, CompleteRegistrationCandidate,
+  ForgotPasswordSendOtp, ForgotPasswordVerifyOtp, ForgotPasswordResetPassword
 } from '../api/AuthProvider';
 
 export const SendOtpCandidateSlice = createAsyncThunk(
@@ -128,6 +129,45 @@ export const LogoutSlice = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const responseData = await LogoutUser();
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const ForgotPasswordSendOtpSlice = createAsyncThunk(
+  'auth/ForgotPasswordSendOtpSlice',
+  async (payload: { email: string }, { rejectWithValue }) => {
+    try {
+      const responseData = await ForgotPasswordSendOtp(payload);
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const ForgotPasswordVerifyOtpSlice = createAsyncThunk(
+  'auth/ForgotPasswordVerifyOtpSlice',
+  async (payload: { email: string; otp: string }, { rejectWithValue }) => {
+    try {
+      const responseData = await ForgotPasswordVerifyOtp(payload);
+      return responseData;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+export const ForgotPasswordResetPasswordSlice = createAsyncThunk(
+  'auth/ForgotPasswordResetPasswordSlice',
+  async (
+    payload: { email: string; new_password: string; confirm_password: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const responseData = await ForgotPasswordResetPassword(payload);
       return responseData;
     } catch (error) {
       return rejectWithValue(error);

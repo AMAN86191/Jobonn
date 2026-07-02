@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, TextInput, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, StatusBar, TextInput, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, SlidersHorizontal } from 'lucide-react-native';
@@ -9,6 +9,8 @@ import { RFValue } from 'react-native-responsive-fontsize';
 import CommanManagerHeader from '../../components/Manager_component/CommanManagerHeader';
 import CandidateCard, { getAvatarColor } from '../../components/Manager_component/CandidateCard';
 import FilterModal, { FilterSection } from '../../components/Manager_component/FilterModal';
+import { useDispatch } from 'react-redux';
+import { getRecommendedCandidatesSlice, getAllInvitationsSlice } from '../../redux/CompanyHomeSlice';
 
 const FILTER_SECTIONS: FilterSection[] = [
   {
@@ -34,23 +36,110 @@ const FILTER_SECTIONS: FilterSection[] = [
   },
 ];
 
-const RECOMMENDED_CANDIDATES = [
-  { id: 'rec_1', name: 'Neha Sharma', role: 'React Native Developer', experience: '3 yrs', location: 'Bangalore', skills: ['React Native', 'TypeScript', 'JavaScript'], matchScore: 95, currentCTC: '12 LPA', expectedCTC: '15 LPA', time: '95% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_2', name: 'Rohan Mehta', role: 'UI/UX Designer', experience: '4 yrs', location: 'Remote', skills: ['Figma', 'Framer', 'UI Design'], matchScore: 89, currentCTC: '15 LPA', expectedCTC: '18 LPA', time: '89% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_3', name: 'Aman Verma', role: 'Full Stack Engineer', experience: '5 yrs', location: 'Hyderabad', skills: ['React', 'Node.js', 'Express', 'MongoDB'], matchScore: 92, currentCTC: '18 LPA', expectedCTC: '22 LPA', time: '92% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_4', name: 'Kirti Singh', role: 'Product Manager', experience: '6 yrs', location: 'Mumbai', skills: ['Agile', 'Scrum', 'Roadmapping'], matchScore: 86, currentCTC: '22 LPA', expectedCTC: '26 LPA', time: '86% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_5', name: 'Devendra Patil', role: 'Backend Developer', experience: '4 yrs', location: 'Pune', skills: ['Python', 'Django', 'PostgreSQL'], matchScore: 91, currentCTC: '14 LPA', expectedCTC: '17 LPA', time: '91% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_6', name: 'Shreya Ghoshal', role: 'iOS Developer', experience: '3 yrs', location: 'Remote', skills: ['Swift', 'SwiftUI', 'CocoaPods'], matchScore: 88, currentCTC: '13 LPA', expectedCTC: '16 LPA', time: '88% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_7', name: 'Vijay Iyer', role: 'DevOps Engineer', experience: '5 yrs', location: 'Bangalore', skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD'], matchScore: 94, currentCTC: '20 LPA', expectedCTC: '25 LPA', time: '94% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_8', name: 'Sneha Reddy', role: 'Frontend Engineer', experience: '2 yrs', location: 'Hyderabad', skills: ['React', 'HTML', 'CSS', 'Redux'], matchScore: 85, currentCTC: '8 LPA', expectedCTC: '10 LPA', time: '85% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_9', name: 'Aditya Birla', role: 'Data Scientist', experience: '4 yrs', location: 'Mumbai', skills: ['Machine Learning', 'Python', 'R', 'Pandas'], matchScore: 90, currentCTC: '16 LPA', expectedCTC: '20 LPA', time: '90% Match', image: require('../../../assets/images/boy.png') },
-  { id: 'rec_10', name: 'Pooja Hegde', role: 'QA Engineer', experience: '3 yrs', location: 'Noida', skills: ['Selenium', 'Jira', 'Manual Testing'], matchScore: 87, currentCTC: '10 LPA', expectedCTC: '12 LPA', time: '87% Match', image: require('../../../assets/images/boy.png') },
-];
+const TABS = ['Recommended', 'Invited', 'Accepted', 'Rejected'];
+
+const normalizeRecommendedCandidate = (cand: any) => {
+  if (!cand) return null;
+
+  // Extract name and email
+  const name = cand.name || cand.user?.name || '';
+  const email = cand.email || cand.user?.email || '';
+
+  // Extract professional details
+  const role = cand.professional_detail?.job_title || cand.job_title || cand.role || '';
+  const experience = cand.professional_detail?.experience || cand.experience || 'Fresher';
+
+  // Extract location
+  let location = cand.location || '';
+  if (!location && cand.personal_detail) {
+    const city = cand.personal_detail.city || '';
+    const state = cand.personal_detail.state || '';
+    if (city && state) {
+      location = `${city}, ${state}`;
+    } else {
+      location = city || state || '';
+    }
+  }
+
+  // Extract CTC
+  const rawCurrentCTC = cand.professional_detail?.current_ctc || cand.current_ctc;
+  const currentCTC = rawCurrentCTC ? `${rawCurrentCTC} LPA` : undefined;
+
+  const rawExpectedCTC = cand.professional_detail?.expected_salary || cand.expected_salary;
+  const expectedCTC = rawExpectedCTC ? `${rawExpectedCTC} LPA` : undefined;
+
+  // Extract Image
+  const profileImg = cand.profile_img || cand.docs?.profile_img || cand.image;
+
+  // Extract notice period
+  const noticePeriod = cand.professional_detail?.notice_period || cand.notice_period || 'Immediate';
+
+  return {
+    id: String(cand.id),
+    user_id: cand.user_id,
+    candidate_id: cand.id,
+    name,
+    role,
+    experience,
+    location,
+    status: undefined,
+    currentCTC,
+    expectedCTC,
+    image: profileImg ? { uri: profileImg.startsWith('http') ? profileImg : `https://admin.jobonn.in/storage/${profileImg}` } : undefined,
+    emailAddress: email,
+    phoneNumber: cand.phone || '',
+    whatsappNumber: cand.phone || '',
+    noticePeriod,
+    preferredLocation: location,
+    rawCandidate: cand,
+  };
+};
 
 const RecommendedCandidatesScreen = ({ navigation }: any) => {
+  const dispatch = useDispatch();
+  const [activeTab, setActiveTab] = useState('Recommended');
   const [search, setSearch] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [invitations, setInvitations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchCandidates = async () => {
+    try {
+      setLoading(true);
+      const recommendedRes = await dispatch(getRecommendedCandidatesSlice() as any).unwrap();
+      console.log('getRecommendedCandidates API response:', recommendedRes);
+      const rawList = recommendedRes?.data || recommendedRes?.candidates || (Array.isArray(recommendedRes) ? recommendedRes : []);
+      const normalized = rawList.map((c: any) => normalizeRecommendedCandidate(c)).filter(Boolean);
+      setCandidates(normalized);
+
+      const invitationsRes = await dispatch(getAllInvitationsSlice() as any).unwrap();
+      console.log('getAllInvitations API response:', invitationsRes);
+      const rawInvites = invitationsRes?.invitations?.data || invitationsRes?.data || [];
+      const normalizedInvites = rawInvites.map((invite: any) => {
+        const cand = invite.candidate || invite.candidate_profile || invite;
+        if (!cand) return null;
+        const normalized = normalizeRecommendedCandidate(cand);
+        if (!normalized) return null;
+        return {
+          ...normalized,
+          status: invite.status,
+          appliedJob: invite.job?.job_title?.job_name || invite.job?.job_title || invite.job?.title,
+          invitationId: invite.id,
+        };
+      }).filter(Boolean);
+      setInvitations(normalizedInvites);
+    } catch (e) {
+      console.log('Error fetching recommended candidates and invitations:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
 
   const handleFilterSelect = (section: string, key: string) => {
     setSelected(prev => {
@@ -66,26 +155,31 @@ const RecommendedCandidatesScreen = ({ navigation }: any) => {
     });
   };
 
-  const filtered = RECOMMENDED_CANDIDATES.filter(c => {
+  const filtered = (activeTab === 'Recommended' ? candidates : invitations).filter(c => {
     const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.role.toLowerCase().includes(search.toLowerCase()) ||
-      c.skills.some(s => s.toLowerCase().includes(search.toLowerCase()));
+      (Array.isArray(c.skills) && c.skills.some((s: string) => s.toLowerCase().includes(search.toLowerCase())));
 
-    const getCandidateDept = (role: string) => {
-      const r = role.toLowerCase();
-      if (r.includes('developer') || r.includes('engineer') || r.includes('science') || r.includes('qa')) return 'Engineering';
-      if (r.includes('design')) return 'Design';
-      if (r.includes('product')) return 'Product';
-      if (r.includes('sales') || r.includes('marketing')) return 'Sales';
-      return 'HR';
-    };
-
-    const dept = getCandidateDept(c.role);
-    const matchDept = !selected.Department?.length || selected.Department.includes(dept);
     const matchLocation = !selected.Location?.length || selected.Location.includes(c.location);
 
-    return matchSearch && matchDept && matchLocation;
+    if (activeTab !== 'Recommended') {
+      const targetStatus = activeTab.toLowerCase();
+      const cStatus = (c.status || '').toLowerCase();
+      
+      // Map API invitation status "sent" to the "Invited" tab
+      if (targetStatus === 'invited') {
+        if (cStatus !== 'sent' && cStatus !== 'invited') {
+          return false;
+        }
+      } else {
+        if (cStatus !== targetStatus) {
+          return false;
+        }
+      }
+    }
+
+    return matchSearch && matchLocation;
   });
 
   return (
@@ -94,7 +188,7 @@ const RecommendedCandidatesScreen = ({ navigation }: any) => {
 
       <CommanManagerHeader
         navigation={navigation}
-        title="Recommended Candidates"
+        title="Invite Candidates"
       />
 
       {/* Search Bar & Filter */}
@@ -122,17 +216,38 @@ const RecommendedCandidatesScreen = ({ navigation }: any) => {
         </View>
       </View>
 
+      {/* Tabs */}
+      <View style={styles.tabsRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContent}>
+          {TABS.map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+              {activeTab === tab && <View style={styles.tabIndicator} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {filtered.length > 0 ? (
+        {loading ? (
+          <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: hp('5%') }} />
+        ) : filtered.length > 0 ? (
           filtered.map((candidate, index) => (
             <Animated.View
-              key={candidate.id}
+              key={`${candidate.id}-${index}`}
               entering={FadeInDown.delay(index * 50).duration(400)}
             >
               <CandidateCard
                 {...candidate}
                 avatarColor={getAvatarColor(candidate.name)}
-                onPress={() => navigation.navigate('CandidateApplicationFullView', { applicant: candidate, isRecommended: true })}
+                onPress={() => navigation.navigate('CandidateApplicationFullView', { 
+                  applicant: candidate, 
+                  isRecommended: activeTab === 'Recommended' 
+                })}
               />
             </Animated.View>
           ))
@@ -159,7 +274,7 @@ const RecommendedCandidatesScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  searchContainer: { paddingHorizontal: wp('4%'), marginVertical: hp('1%') },
+  searchContainer: { paddingHorizontal: wp('2%'), marginVertical: hp('1%') },
   searchRow: { flexDirection: 'row', gap: wp('2.5%'), alignItems: 'center' },
   searchBox: {
     flex: 1,
@@ -188,9 +303,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  list: { paddingHorizontal: wp('4%') },
+  list: { paddingHorizontal: wp('2%') },
   emptyState: { alignItems: 'center', marginTop: hp('10%') },
   emptyText: { fontSize: RFValue(11), color: Colors.textSecondary, fontWeight: '600' },
+  tabsRow: { marginBottom: hp('1%'), borderBottomWidth: 1, borderBottomColor: Colors.border },
+  tabsContent: { paddingHorizontal: wp('3%'), gap: wp('5%'), flexDirection: 'row' },
+  tab: { paddingVertical: hp('0.8%'), position: 'relative' },
+  tabActive: {},
+  tabText: { fontSize: RFValue(9), fontWeight: '600', color: Colors.textSecondary },
+  tabTextActive: { color: Colors.primary, fontWeight: '700' },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: Colors.primary,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
 });
 
 export default RecommendedCandidatesScreen;

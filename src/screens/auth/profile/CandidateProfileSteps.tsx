@@ -706,11 +706,12 @@ const CandidateProfileSteps: React.FC<CandidateProfileStepsProps> = ({
         onChangeText={(val) => updateField('college', val)}
         error={errors.college}
       />
-      <DatePickerInput
+      <DropdownInput
         label="Passing Year"
         placeholder="Select graduation year"
-        value={formData.passingYear}
-        onChange={(val) => updateField('passingYear', val)}
+        value={formData.passingYear ? String(formData.passingYear.getFullYear()) : ''}
+        options={Array.from({ length: 60 }, (_, i) => String(2035 - i))}
+        onSelect={(year) => updateField('passingYear', new Date(parseInt(year, 10), 0, 1))}
         error={errors.passingYear}
       />
       <CustomInput

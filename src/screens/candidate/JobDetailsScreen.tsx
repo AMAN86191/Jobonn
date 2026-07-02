@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, StatusBar, Pressable, Image, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { ChevronLeft, MapPin, Briefcase, IndianRupee, Send, Clock, Building } from 'lucide-react-native';
+import { ChevronLeft, MapPin, Briefcase, IndianRupee, Send, Clock, Building, Users } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -18,16 +18,95 @@ import CommanManagerHeader from '../../components/Manager_component/CommanManage
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCandidateProfileCompleteness } from '../../utils/candidateProfileCompleteness';
 import Toast from 'react-native-toast-message';
+import { useDispatch } from 'react-redux';
+import { replyCandidateInvitationSlice } from '../../redux/CandidateJobSlice';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const JobDetailsScreen = ({ navigation, route }: any) => {
+  const dispatch = useDispatch();
+  const invite = route?.params?.invite;
+  const [inviteStatus, setInviteStatus] = useState(invite?.status);
+  const [updatingInvite, setUpdatingInvite] = useState(false);
+
+  const handleReplyInvite = async (status: 'accepted' | 'rejected') => {
+    const inviteId = invite?.id;
+    if (!inviteId) return;
+
+    try {
+      setUpdatingInvite(true);
+      const result = await dispatch(
+        replyCandidateInvitationSlice({ invitationId: inviteId, status }) as any
+      ).unwrap();
+      console.log('Reply invite response:', result);
+
+      const apiRes = result?.response || result;
+
+      if (
+        apiRes &&
+        (apiRes.status === true ||
+          apiRes.status_code === 200 ||
+          apiRes.status_code === '200' ||
+          apiRes.status === 'success')
+      ) {
+        setInviteStatus(status);
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: apiRes.message || `Invitation ${status === 'accepted' ? 'accepted' : 'declined'} successfully!`,
+        });
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1000);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed',
+          text2: apiRes?.message || 'Failed to update invitation status',
+        });
+      }
+    } catch (error: any) {
+      console.log('Error replying to invitation:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error?.message || 'Failed to update invitation status',
+      });
+    } finally {
+      setUpdatingInvite(false);
+    }
+  };
+
   const rawJob = route?.params?.job;
+console.log('rawJob', rawJob)
   const job = useMemo(() => {
     if (!rawJob) return jobs[0];
     if ('workMode' in rawJob) return rawJob;
     return normalizeBackendJob(rawJob);
   }, [rawJob]);
+
+  const isUrgent = useMemo(() => {
+    return job.rawJob?.is_urgent === 1 || rawJob?.is_urgent === 1 || rawJob?.rawJob?.is_urgent === 1;
+  }, [job, rawJob]);
+
+  const expiryDate = useMemo(() => {
+    return job.rawJob?.expiry_date || rawJob?.expiry_date || rawJob?.rawJob?.expiry_date;
+  }, [job, rawJob]);
+
+  const formatDeadline = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (e) {
+      return dateStr;
+    }
+  };
 
   const [user, setUser] = useState<any>(null);
 
@@ -155,7 +234,14 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
         <View style={styles.topSection}>
           <View style={styles.titleRow}>
             <View style={styles.titleInfo}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp('2%'), flexWrap: 'wrap' }}>
+                <Text style={styles.jobTitle}>{job.title}</Text>
+                {isUrgent && (
+                  <View style={styles.urgentBadge}>
+                    <Text style={styles.urgentBadgeText}>Urgent</Text>
+                  </View>
+                )}
+              </View>
               <View style={styles.companyRow}>
                 <Building color={Colors.primary} size={RFValue(11)} />
                 <Text style={styles.companyName}>{job.company}</Text>
@@ -205,28 +291,39 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
             </View>
           </View>
 
-          {(job.posted || job.openings || job.applicants) ? (
+          {(job.posted || job.openings || job.applicants || expiryDate) ? (
             <View style={styles.statsRow}>
               {(() => {
                 const stats = [];
                 if (job.posted) {
                   stats.push(
                     <View key="posted" style={styles.statItem}>
-                      <Clock color={Colors.textSecondary} size={RFValue(10.5)} />
+                      <Clock color={Colors.textSecondary} size={RFValue(10)} />
                       <Text style={styles.postedText}>Posted: {job.posted}</Text>
+                    </View>
+                  );
+                }
+                if (expiryDate) {
+                  stats.push(
+                    <View key="expiry" style={styles.statItem}>
+                      <Clock color={Colors.textSecondary} size={RFValue(10)} />
+                      <Text style={styles.postedText}>Deadline: {formatDeadline(expiryDate)}</Text>
                     </View>
                   );
                 }
                 if (job.openings) {
                   stats.push(
-                    <Text key="openings" style={styles.postedText}>Openings: {job.openings}</Text>
+                    <View key="openings" style={styles.statItem}>
+                      <Users color={Colors.textSecondary} size={RFValue(10)} />
+                      <Text style={styles.postedText}>Openings: {job.openings}</Text>
+                    </View>
                   );
                 }
-                if (job.applicants !== undefined && job.applicants !== null) {
-                  stats.push(
-                    <Text key="applicants" style={styles.postedText}>Applicants: {job.applicants}</Text>
-                  );
-                }
+                // if (job.applicants !== undefined && job.applicants !== null) {
+                //   stats.push(
+                //     <Text key="applicants" style={styles.postedText}>Applicants: {job.applicants}</Text>
+                //   );
+                // }
 
                 const joined = [];
                 for (let i = 0; i < stats.length; i++) {
@@ -289,29 +386,55 @@ const JobDetailsScreen = ({ navigation, route }: any) => {
 
       {/* Bottom Action Bar */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(inset.bottom, hp('2%')) }]}>
-        <AnimatedPressable
-          style={[styles.applyBtn, applyAnimStyle]}
-          onPressIn={() => applyScale.value = withSpring(0.96)}
-          onPressOut={() => applyScale.value = withSpring(1)}
-          onPress={() => {
-
-            const completeness = getCandidateProfileCompleteness(user);
-            if (completeness.percentage < 90) {
-              Toast.show({
-                type: 'error',
-                text1: 'Profile Incomplete',
-                text2: `Please complete your profile to apply (Current progress: ${completeness.percentage}%). Minimum 90% required.`,
-              });
-              return;
-            }
-            navigation.navigate('ApplyJobFlow', { job });
-          }}
-        >
-          <Send color={Colors.white} size={RFValue(11)} style={{ marginRight: wp('1%') }} />
-          <View style={styles.applyBtnTextContainer}>
-            <Text style={styles.applyBtnText}>Apply Now</Text>
-          </View>
-        </AnimatedPressable>
+        {invite ? (
+          inviteStatus === 'pending' ? (
+            <View style={{ flexDirection: 'row', gap: wp('3%'), flex: 1, marginBottom: hp('1%') }}>
+              <TouchableOpacity
+                style={[styles.applyBtn, { backgroundColor: Colors.danger + '15', borderColor: Colors.danger, borderWidth: 1 }]}
+                disabled={updatingInvite}
+                onPress={() => handleReplyInvite('rejected')}
+              >
+                <Text style={{ color: Colors.danger, fontWeight: '700', fontSize: RFValue(11) }}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.applyBtn, { backgroundColor: Colors.primary }]}
+                disabled={updatingInvite}
+                onPress={() => handleReplyInvite('accepted')}
+              >
+                <Text style={{ color: Colors.white, fontWeight: '700', fontSize: RFValue(11) }}>Accept Invite</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={[styles.applyBtn, { backgroundColor: Colors.border, marginBottom: hp('1%') }]}>
+              <Text style={{ color: Colors.textSecondary, fontWeight: '700', fontSize: RFValue(11) }}>
+                {inviteStatus === 'accepted' ? 'Accepted' : inviteStatus === 'rejected' ? 'Declined' : inviteStatus === 'shortlisted' ? 'Shortlisted' : inviteStatus}
+              </Text>
+            </View>
+          )
+        ) : (
+          <AnimatedPressable
+            style={[styles.applyBtn, applyAnimStyle]}
+            onPressIn={() => applyScale.value = withSpring(0.96)}
+            onPressOut={() => applyScale.value = withSpring(1)}
+            onPress={() => {
+              const completeness = getCandidateProfileCompleteness(user);
+              if (completeness.percentage < 90) {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Profile Incomplete',
+                  text2: `Please complete your profile to apply (Current progress: ${completeness.percentage}%). Minimum 90% required.`,
+                });
+                return;
+              }
+              navigation.navigate('ApplyJobFlow', { job });
+            }}
+          >
+            <Send color={Colors.white} size={RFValue(11)} style={{ marginRight: wp('1%') }} />
+            <View style={styles.applyBtnTextContainer}>
+              <Text style={styles.applyBtnText}>Apply Now</Text>
+            </View>
+          </AnimatedPressable>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -423,8 +546,8 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp('2%'),
-    paddingTop: hp('1.5%'),
+    gap: wp('1.5%'),
+    paddingTop: hp('1%'),
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
@@ -434,7 +557,7 @@ const styles = StyleSheet.create({
     gap: wp('1%'),
   },
   postedText: {
-    fontSize: RFValue(9.5),
+    fontSize: RFValue(9.1),
     color: Colors.textSecondary,
   },
   tabsContainer: {
@@ -487,7 +610,7 @@ const styles = StyleSheet.create({
   tabContent: {
     backgroundColor: Colors.white,
     paddingHorizontal: wp('4%'),
-    paddingVertical: hp('3%'),
+    paddingVertical: hp('1%'),
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: Colors.borderLight,
@@ -496,7 +619,7 @@ const styles = StyleSheet.create({
     fontSize: RFValue(12),
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: hp('2%'),
+    marginBottom: hp('1%'),
   },
   roleBulletRow: {
     flexDirection: 'row',
@@ -668,6 +791,22 @@ const styles = StyleSheet.create({
     fontSize: RFValue(8),
     color: Colors.white,
     opacity: 0.8,
+  },
+  urgentBadge: {
+    backgroundColor: '#FEE2E2',
+    borderColor: Colors.warning,
+    borderWidth: 1,
+    paddingHorizontal: wp('2%'),
+    paddingVertical: hp('0.3%'),
+    borderRadius: wp('1%'),
+    alignSelf: 'center',
+    marginBottom: hp('0.5%'),
+  },
+  urgentBadgeText: {
+    color: Colors.warning,
+    fontSize: RFValue(8),
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
 });
 

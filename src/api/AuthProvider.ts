@@ -120,6 +120,40 @@ export const CompleteRegistrationCandidate = async (formData: FormData) => {
   }
 };
 
+export const ForgotPasswordSendOtp = async (payload: { email: string }) => {
+  try {
+    const response = await api.post(`/forgot-password/send-otp`, payload);
+    return response.data;
+  } catch (error: any) {
+    const data = error.response?.data ?? { message: error.message };
+    throw data;
+  }
+};
+
+export const ForgotPasswordVerifyOtp = async (payload: { email: string; otp: string }) => {
+  try {
+    const response = await api.post(`/forgot-password/verify-otp`, payload);
+    return response.data;
+  } catch (error: any) {
+    const data = error.response?.data ?? { message: error.message };
+    throw data;
+  }
+};
+
+export const ForgotPasswordResetPassword = async (payload: {
+  email: string;
+  new_password: string;
+  confirm_password: string;
+}) => {
+  try {
+    const response = await api.post(`/forgot-password/reset-password`, payload);
+    return response.data;
+  } catch (error: any) {
+    const data = error.response?.data ?? { message: error.message };
+    throw data;
+  }
+};
+
 
 
 

@@ -17,8 +17,8 @@ export const ProfileInfoForm = ({ editData, setEditData }: any) => (
     <CustomInput label="Full Name" value={editData.name} onChangeText={(text: string) => setEditData({ ...editData, name: text })} placeholder="Enter name" />
     <CustomInput label="Job Title" value={editData.job_title} onChangeText={(text: string) => setEditData({ ...editData, job_title: text })} placeholder="Enter job title" />
     {/* <CustomInput label="Location" value={editData.current_location} onChangeText={(text: string) => setEditData({ ...editData, current_location: text })} placeholder="Enter location" /> */}
-    <CustomInput label="Email" value={editData.email} onChangeText={(text: string) => setEditData({ ...editData, email: text })} placeholder="Enter email" keyboardType="email-address" autoCapitalize="none" />
-    <CustomInput label="Phone" value={editData.phone} onChangeText={(text: string) => setEditData({ ...editData, phone: text })} placeholder="Enter phone" keyboardType="phone-pad" />
+    <CustomInput label="Email" value={editData.email} readOnly onChangeText={(text: string) => setEditData({ ...editData, email: text })} placeholder="Enter email" keyboardType="email-address" autoCapitalize="none" />
+    <CustomInput label="Phone" value={editData.phone} readOnly onChangeText={(text: string) => setEditData({ ...editData, phone: text })} placeholder="Enter phone" keyboardType="phone-pad" />
   </>
 );
 
@@ -41,7 +41,7 @@ export const ProfessionalDetailsForm = ({ editData, setEditData }: any) => {
           </View>
           <CustomInput label="Current Company" value={editData.current_company} onChangeText={(text: string) => setEditData({ ...editData, current_company: text })} placeholder="Enter current company" />
           <CustomInput label="Current Location" value={editData.current_location} onChangeText={(text: string) => setEditData({ ...editData, current_location: text })} placeholder="e.g. Bangalore" />
-          <CustomInput label="Current CTC" value={editData.ctc} onChangeText={(text: string) => setEditData({ ...editData, ctc: text })} placeholder="e.g. 8" keyboardType="numeric" />
+          <CustomInput label="Current CTC (Annual)" value={editData.ctc} onChangeText={(text: string) => setEditData({ ...editData, ctc: text })} placeholder="e.g. 8" keyboardType="numeric" />
         </>
       )}
     </>
@@ -204,12 +204,12 @@ export const EducationForm = ({ editData, setEditData }: any) => (
       onChangeText={(text: string) => setEditData({ ...editData, institute_name: text })}
       placeholder="Enter your college or university name"
     />
-    <DatePickerInput
+    <DropdownInput
       label="Passing Year"
       placeholder="Select graduation year"
-      value={editData.passing_year}
-      onChange={(date: Date) => setEditData({ ...editData, passing_year: date })}
-      mode="year"
+      value={editData.passing_year ? String(editData.passing_year.getFullYear()) : ''}
+      options={Array.from({ length: 60 }, (_, i) => String(2035 - i))}
+      onSelect={(year: string) => setEditData({ ...editData, passing_year: new Date(parseInt(year, 10), 0, 1) })}
     />
     <CustomInput
       label="Percentage / CGPA"
@@ -258,7 +258,7 @@ export const SummaryForm = ({ editData, setEditData }: any) => (
 export const CareerPreferenceForm = ({ editData, setEditData }: any) => (
   <>
     <CustomInput label="Preferred Location" value={editData.preferred_location} onChangeText={(text: string) => setEditData({ ...editData, preferred_location: text })} placeholder="e.g. Remote, Bangalore" />
-    <CustomInput label="Expected Salary" value={editData.expected_salary} onChangeText={(text: string) => setEditData({ ...editData, expected_salary: text })} placeholder="e.g. 12" keyboardType="numeric" />
+    <CustomInput label="Expected Salary (Annual)" value={editData.expected_salary} onChangeText={(text: string) => setEditData({ ...editData, expected_salary: text })} placeholder="e.g. 12" keyboardType="numeric" />
     <DropdownInput
       label="Preferred Shift"
       placeholder="Select"

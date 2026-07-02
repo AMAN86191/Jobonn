@@ -11,6 +11,7 @@ import { store } from './src/redux/store';
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { logAppOpen } from './src/services/firebase/analytics'
+import { requestUserPermission, getFCMToken, initNotificationListeners } from './src/utils/pushNotificationHelper'
 
 const App = () => {
   const { isRestartRequired, newReleaseBundle } = useStallionUpdate()
@@ -18,6 +19,24 @@ const App = () => {
   const [isDownloading, setIsDownloading] = useState(false)
   useEffect(() => {
     logAppOpen();
+
+    const setupNotifications = async () => {
+      try {
+        const hasPermission = await requestUserPermission();
+        if (hasPermission) {
+          await getFCMToken();
+        }
+      } catch (err) {
+        console.error('[App] Notification setup failed:', err);
+      }
+    };
+
+    setupNotifications();
+    const unsubscribeNotifications = initNotificationListeners();
+
+    return () => {
+      unsubscribeNotifications();
+    };
   }, []);
 
   useEffect(() => {

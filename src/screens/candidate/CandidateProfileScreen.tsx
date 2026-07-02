@@ -12,6 +12,7 @@ import { getCandidateProfileCompleteness } from '../../utils/candidateProfileCom
 
 import { useDispatch } from 'react-redux';
 import { getProfileSlice, updateProfileSlice } from '../../redux/CandidateProfileSlice';
+import Toast from 'react-native-toast-message';
 
 import {
   ProfileHeaderInfo,
@@ -89,10 +90,12 @@ const CandidateProfileScreen = ({ navigation }: any) => {
           ...userObj,
           candidate: {
             ...candidate,
-            applied_jobs_count: response.applied_jobs_count ?? candidate.applied_jobs_count ?? 0
+            applied_jobs_count: response.applied_jobs_count ?? candidate.applied_jobs_count ?? 0,
+            interviews_count: response.interviews_count ?? candidate.interviews_count ?? 0
           },
           role: userObj.role || 'candidate',
-          applied_jobs_count: response.applied_jobs_count ?? candidate.applied_jobs_count ?? 0
+          applied_jobs_count: response.applied_jobs_count ?? candidate.applied_jobs_count ?? 0,
+          interviews_count: response.interviews_count ?? candidate.interviews_count ?? 0
         };
         // Save to cache
         await AsyncStorage.setItem('userData', JSON.stringify(mappedUser));
@@ -136,9 +139,9 @@ const CandidateProfileScreen = ({ navigation }: any) => {
 
     setEditData({
       // Profile Info
-      name: user.name || '',
-      email: user.email || '',
-      phone: user.phone || '',
+      name: user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
       job_title: professional.job_title || cand.designation || '',
       current_location: cand.current_location || personal.city || '',
 
@@ -235,11 +238,19 @@ const CandidateProfileScreen = ({ navigation }: any) => {
       // Fetch fresh profile from backend to update state and storage cache
       await fetchProfile();
 
-      ToastAndroid.show('Profile updated successfully!', ToastAndroid.SHORT);
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Profile updated successfully!',
+      });
       closeModal();
     } catch (error: any) {
       console.error('Update failed:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: error.message || 'Failed to update profile',
+      });
     } finally {
       setSaving(false);
     }
@@ -349,7 +360,11 @@ const CandidateProfileScreen = ({ navigation }: any) => {
           <CandidateProfileCompletenessBanner user={user} navigation={navigation} />
 
           <ProfileHeaderInfo user={user} profile={normalizedProfile} completenessValue={completeness.percentage} onEdit={() => openModal('documents')} />
-          <StatsRow appliedJobsCount={user?.candidate?.applied_jobs_count || user?.applied_jobs_count || 0} />
+          <StatsRow 
+            appliedJobsCount={user?.candidate?.applied_jobs_count || user?.applied_jobs_count || 0} 
+            views_count={user?.candidate?.views_count || user?.views_count || 0}
+            interviews_count={user?.candidate?.interviews_count || user?.interviews_count || 0}
+          />
           <ResumeCard user={user} profile={normalizedProfile} onEdit={() => openModal('documents')} />
           <ProfileSummaryCard profile={normalizedProfile} onEdit={() => openModal('summary')} />
           <CareerPreferenceCard profile={normalizedProfile} onEdit={() => openModal('career')} />

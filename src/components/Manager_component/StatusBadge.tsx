@@ -4,19 +4,9 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import { Colors } from '../../theme/Colors';
 import { RFValue } from 'react-native-responsive-fontsize';
 
-export type StatusType =
-  | 'New'
-  | 'Shortlisted'
-  | 'Interview'
-  | 'Offered'
-  | 'Hired'
-  | 'Rejected'
-  | 'Active'
-  | 'Paused'
-  | 'Closed'
-  | 'Pending';
+export type StatusType = string;
 
-const STATUS_CONFIG: Record<StatusType, { bg: string; color: string; dot?: boolean }> = {
+const STATUS_CONFIG: Record<string, { bg: string; color: string; dot?: boolean }> = {
   New:         { bg: Colors.infoLight,    color: Colors.info,          dot: true },
   Shortlisted: { bg: Colors.primaryLight, color: Colors.primary,       dot: true },
   Interview:   { bg: Colors.warningLight, color: Colors.warning,       dot: true },
@@ -27,6 +17,8 @@ const STATUS_CONFIG: Record<StatusType, { bg: string; color: string; dot?: boole
   Paused:      { bg: Colors.warningLight, color: Colors.warning,       dot: false },
   Closed:      { bg: Colors.borderLight,  color: Colors.textSecondary, dot: false },
   Pending:     { bg: Colors.infoLight,    color: Colors.info,          dot: true },
+  Invited:     { bg: Colors.primaryLight, color: Colors.primary,       dot: true },
+  Sent:        { bg: Colors.primaryLight, color: Colors.primary,       dot: true },
 };
 
 interface StatusBadgeProps {
@@ -35,13 +27,33 @@ interface StatusBadgeProps {
 }
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' }) => {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.Pending;
+  const statusStr = String(status || '').trim();
+  let normalizedStatus = 'Pending';
+
+  const lower = statusStr.toLowerCase();
+  if (lower === 'sent') normalizedStatus = 'Sent';
+  else if (lower === 'invited') normalizedStatus = 'Invited';
+  else if (lower === 'accepted') normalizedStatus = 'Accepted';
+  else if (lower === 'rejected') normalizedStatus = 'Rejected';
+  else if (lower === 'shortlisted') normalizedStatus = 'Shortlisted';
+  else if (lower === 'interview') normalizedStatus = 'Interview';
+  else if (lower === 'offered') normalizedStatus = 'Offered';
+  else if (lower === 'hired') normalizedStatus = 'Hired';
+  else if (lower === 'active') normalizedStatus = 'Active';
+  else if (lower === 'paused') normalizedStatus = 'Paused';
+  else if (lower === 'closed') normalizedStatus = 'Closed';
+  else if (lower === 'new') normalizedStatus = 'New';
+  else {
+    normalizedStatus = statusStr.charAt(0).toUpperCase() + statusStr.slice(1).toLowerCase();
+  }
+
+  const cfg = STATUS_CONFIG[normalizedStatus] ?? STATUS_CONFIG.Pending;
   const isLarge = size === 'md';
 
   return (
     <View style={[styles.badge, { backgroundColor: cfg.bg }, isLarge && styles.badgeLg]}>
       {cfg.dot && <View style={[styles.dot, { backgroundColor: cfg.color }]} />}
-      <Text style={[styles.text, { color: cfg.color }, isLarge && styles.textLg]}>{status}</Text>
+      <Text style={[styles.text, { color: cfg.color }, isLarge && styles.textLg]}>{normalizedStatus}</Text>
     </View>
   );
 };

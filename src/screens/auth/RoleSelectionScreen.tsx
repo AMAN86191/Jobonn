@@ -158,7 +158,7 @@ const RoleSelectionScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
           <Text style={styles.headerTitle}>
-            {fromSignup ? 'I want to...' : 'I am a...'}
+            {fromSignup ? 'I am a...' : 'I am a...'}
           </Text>
           <Text style={styles.headerSubtitle}>
             {fromSignup
